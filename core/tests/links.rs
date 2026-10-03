@@ -75,6 +75,20 @@ fn master_selection_preserves_non_markdown_assets_and_empty_directories() {
 }
 
 #[test]
+fn later_divergence_refuses_before_trashing_earlier_identical_copy() {
+    let temp = tempfile::tempdir().unwrap();
+    let roots = roots(temp.path());
+    let trash = temp.path().join("Trash");
+    skill(&roots[0], "alpha", "same");
+    skill(&roots[1], "alpha", "same");
+    skill(&roots[2], "alpha", "other");
+    let error = choose_master_in(&roots, "alpha", &roots[0].path, &trash).unwrap_err().to_string();
+    assert!(error.contains("root-2"), "{error}");
+    assert!(fs::symlink_metadata(roots[1].path.join("alpha")).unwrap().is_dir());
+    assert!(!trash.exists());
+}
+
+#[test]
 fn missing_counts_all_configured_roots_and_link_everywhere_reports_partial_failure() {
     let temp = tempfile::tempdir().unwrap();
     let roots = roots(temp.path());

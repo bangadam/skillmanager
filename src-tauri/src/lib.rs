@@ -34,10 +34,16 @@ fn missing_skills() -> Result<Vec<skillmanager_core::SkillState>, String> {
     Ok(skillmanager_core::missing(&skills, &roots).into_iter().cloned().collect())
 }
 
+#[tauri::command]
+fn find_duplicates() -> Result<Vec<skillmanager_core::DuplicatePair>, String> {
+    let roots = skillmanager_core::default_roots().map_err(|error| error.to_string())?;
+    skillmanager_core::find_duplicates(&roots).map_err(|error| error.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![scan_skills, configured_roots, link_skill, choose_master, link_everywhere, missing_skills])
+        .invoke_handler(tauri::generate_handler![scan_skills, find_duplicates, configured_roots, link_skill, choose_master, link_everywhere, missing_skills])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -1,5 +1,7 @@
 mod links;
 pub use links::{choose_master, choose_master_in, link, link_everywhere, missing, LinkEverywhereResult};
+mod duplicates;
+pub use duplicates::{find_duplicates, DuplicatePair};
 
 use gray_matter::{engine::YAML, Matter};
 use serde::{Deserialize, Serialize};
