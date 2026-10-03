@@ -20,7 +20,11 @@ struct Text {
 
 impl Text {
     fn new(content: &str) -> Self {
-        let normalized = content.split_whitespace().map(str::to_lowercase).collect::<Vec<_>>().join(" ");
+        let mut normalized = String::with_capacity(content.len());
+        for word in content.split_whitespace() {
+            if !normalized.is_empty() { normalized.push(' '); }
+            for ch in word.chars().flat_map(char::to_lowercase) { normalized.push(ch); }
+        }
         let words: Vec<_> = normalized.split_whitespace().collect();
         let mut shingles: Vec<String> = if words.len() < 2 {
             words.iter().map(|word| (*word).to_owned()).collect()
