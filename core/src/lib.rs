@@ -1,3 +1,6 @@
+mod watch;
+pub use watch::{watch, WatchGuard};
+
 use gray_matter::{engine::YAML, Matter};
 use serde::{Deserialize, Serialize};
 use std::{

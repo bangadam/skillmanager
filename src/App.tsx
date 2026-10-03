@@ -1,20 +1,9 @@
-import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { useSkills, type Agent } from "@/hooks/use-skills";
 import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 
-type Agent = "claude_code" | "codex" | "cursor" | "omp";
-type Presence = { agent: Agent; path: string; kind: "real_dir" | "link" };
-type SkillState = {
-  id: string;
-  name: string;
-  description: string;
-  presences: Presence[];
-  date_millis: number | null;
-  date_source: "created" | "modified" | "unavailable";
-};
 
 const agentLabels: Record<Agent, { short: string; long: string }> = {
   claude_code: { short: "CC", long: "Claude Code" },
@@ -24,17 +13,7 @@ const agentLabels: Record<Agent, { short: string; long: string }> = {
 };
 
 export default function App() {
-  const [skills, setSkills] = useState<SkillState[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    invoke<SkillState[]>("scan_skills").then(
-      (result) => { if (active) setSkills(result); },
-      (reason: unknown) => { if (active) setError(String(reason)); },
-    );
-    return () => { active = false; };
-  }, []);
+  const { skills, error } = useSkills();
 
   return (
     <main className="min-h-screen bg-background px-8 pb-16 pt-12 text-foreground sm:px-12">

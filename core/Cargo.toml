@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 gray_matter = { version = "0.3", features = ["yaml"] }
+notify-debouncer-mini = "0.7"
 
 [dev-dependencies]
 tempfile = "3"
