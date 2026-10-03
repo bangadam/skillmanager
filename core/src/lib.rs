@@ -1,5 +1,7 @@
 mod watch;
 pub use watch::{watch, WatchGuard};
+mod duplicates;
+pub use duplicates::{find_duplicates, DuplicatePair};
 
 use gray_matter::{engine::YAML, Matter};
 use serde::{Deserialize, Serialize};
