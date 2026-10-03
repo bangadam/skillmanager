@@ -39,6 +39,17 @@ fn skill_diff(id: String, left_root: String, right_root: String) -> Result<skill
 }
 
 #[tauri::command]
+fn read_skill_md(id: String) -> Result<String, String> {
+    skillmanager_core::read_skill_md(&configured_roots()?, &id).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn edit_skill(id: String, new_content: String) -> Result<skillmanager_core::EditResult, String> {
+    let result = skillmanager_core::edit_skill(&configured_roots()?, &id, &new_content).map_err(|error| error.to_string())?;
+    Ok(skillmanager_core::EditResult { skills: scan_skills()?.skills, files_written: result.files_written })
+}
+
+#[tauri::command]
 fn replace_with_link(id: String, target_root: String, master_root: String) -> Result<skillmanager_core::ScanState, String> {
     let roots = configured_roots()?;
     skillmanager_core::replace_with_link(&roots, &id, std::path::Path::new(&target_root), std::path::Path::new(&master_root)).map_err(|error| error.to_string())?;
@@ -138,7 +149,7 @@ pub fn run() {
             })?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![scan_skills, find_duplicates, configured_roots, link_skill, choose_master, link_everywhere, missing_skills, rename_skill, plan_uninstall, uninstall_skill, skill_diff, replace_with_link])
+        .invoke_handler(tauri::generate_handler![scan_skills, find_duplicates, configured_roots, link_skill, choose_master, link_everywhere, missing_skills, rename_skill, plan_uninstall, uninstall_skill, skill_diff, replace_with_link, read_skill_md, edit_skill])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

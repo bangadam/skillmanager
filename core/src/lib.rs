@@ -1,3 +1,5 @@
+mod edit;
+pub use edit::{edit_skill, read_skill_md, EditResult};
 mod divergence;
 pub use divergence::{replace_with_link, replace_with_link_in, skill_diff, DivergentPair, SkillDiff};
 mod rename;

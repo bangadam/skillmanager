@@ -69,7 +69,7 @@ export function SkillToolbar({ query, setQuery, sort, setSort }: {
   );
 }
 
-export function AllView({ skills, allSkills, query, sort, onRefresh, onDiff, onUninstall }: { skills: SkillState[]; allSkills: SkillState[]; query: string; sort: SkillSort; onRefresh: (skills: SkillState[]) => void; onDiff?: (skill: SkillState) => void; onUninstall: (skill: SkillState) => void }) {
+export function AllView({ skills, allSkills, query, sort, onRefresh, onDiff, onUninstall, onEdit }: { skills: SkillState[]; allSkills: SkillState[]; query: string; sort: SkillSort; onRefresh: (skills: SkillState[]) => void; onDiff?: (skill: SkillState) => void; onUninstall: (skill: SkillState) => void; onEdit: (skill: SkillState) => void }) {
   const visibleSkills = filterAndSortSkills(skills, query, sort);
   return (
     <section aria-label="Skills">
@@ -92,7 +92,7 @@ export function AllView({ skills, allSkills, query, sort, onRefresh, onDiff, onU
               <TableHead>Description</TableHead>
               <TableHead className="w-[190px]">Agents</TableHead>
               <TableHead className="w-[135px] text-right">Created</TableHead>
-              <TableHead className="w-[170px] text-right">Actions</TableHead>
+              <TableHead className="w-[230px] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -114,7 +114,7 @@ export function AllView({ skills, allSkills, query, sort, onRefresh, onDiff, onU
                   {skill.date_source === "modified" && <span className="sr-only"> (modified, not created)</span>}
                 </TableCell>
                 <TableCell className="py-5 text-right align-top">
-                  {!skill.managed_source && <><RenameDialog skill={skill} skills={allSkills} onRefresh={onRefresh} /><Button variant="ghost" size="sm" onClick={() => onUninstall(skill)}>Uninstall <span className="sr-only">{skill.name}</span></Button></>}
+                  {!skill.managed_source && <><Button variant="ghost" size="sm" onClick={() => onEdit(skill)}>Edit <span className="sr-only">{skill.name}</span></Button><RenameDialog skill={skill} skills={allSkills} onRefresh={onRefresh} /><Button variant="ghost" size="sm" onClick={() => onUninstall(skill)}>Uninstall <span className="sr-only">{skill.name}</span></Button></>}
                 </TableCell>
               </TableRow>
             ))}
