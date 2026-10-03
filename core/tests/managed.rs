@@ -19,11 +19,14 @@ fn configured_extra_roots_join_personal_scan_and_missing_config_is_not_an_error(
     let before = scan_state(&roots, &config, &[]).unwrap();
     assert_eq!(before.skills.iter().map(|s| s.id.as_str()).collect::<Vec<_>>(), ["one"]);
     assert!(before.config_error.is_none());
+    assert!(before.config_notice.as_ref().unwrap().contains("roots.json"));
     fs::write(&config, format!(r#"[{{"agent":"cursor","path":"{}"}}]"#, extra.display())).unwrap();
     let after = scan_state(&roots, &config, &[]).unwrap();
     assert_eq!(after.skills.iter().map(|s| s.id.as_str()).collect::<Vec<_>>(), ["one", "two"]);
     assert_eq!(after.skills[1].presences[0].agent, Agent::Cursor);
     assert!(after.config_error.is_none());
+    assert!(after.config_notice.is_none());
+    assert_eq!(after.roots.len(), 2);
 }
 
 #[test]
