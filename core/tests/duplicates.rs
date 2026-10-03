@@ -38,10 +38,11 @@ fn pairs_exact_text_across_different_names_and_lists_each_copy() {
 #[test]
 fn near_matches_pair_but_unrelated_content_does_not() {
     let temp = tempfile::tempdir().unwrap();
-    let a = "Prepare the workspace before editing the skill. Read its instructions and check existing examples. Save the file only after reviewing the expected output. Keep changes small and explain their purpose. Test the result with a local fixture.";
-    let b = "Prepare the workspace before editing the skill. Read its instructions and check existing examples. Save the file only after reviewing the expected output. Keep changes small and explain their purpose. Test the result with a separate sample.";
-    skill(temp.path(), "alpha", a);
-    skill(temp.path(), "beta", b);
+    let shared = "Prepare the workspace before editing the skill. Read its instructions and check existing examples. Save the file only after reviewing the expected output. Keep changes small and explain their purpose. Test the result with a local fixture. Confirm that the expected output reflects the actual files. Document the steps so another agent can reproduce the behavior.";
+    let a = format!("{shared}\n\nRun a final check locally.\n\n{shared}");
+    let b = format!("{shared}\n\nCollect a review sample instead.\n\n{shared}");
+    skill(temp.path(), "alpha", &a);
+    skill(temp.path(), "beta", &b);
     skill(temp.path(), "gamma", "Create colorful charts from sales spreadsheets.");
     let roots = [Root { agent: Agent::Omp, path: temp.path().to_path_buf() }];
     let pairs = find_duplicates(&roots).unwrap();
