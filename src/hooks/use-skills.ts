@@ -1,17 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-
-export type Agent = "claude_code" | "codex" | "cursor" | "omp";
-export type Presence = { agent: Agent; path: string; kind: "real_dir" | "link" };
-export type SkillState = {
-  id: string;
-  name: string;
-  description: string;
-  presences: Presence[];
-  date_millis: number | null;
-  date_source: "created" | "modified" | "unavailable";
-};
+import type { SkillState } from "@/views/all";
 
 export function useSkills() {
   const [skills, setSkills] = useState<SkillState[] | null>(null);

@@ -43,6 +43,12 @@ fn missing_roots_do_not_prevent_watching_existing_roots() {
     fs::create_dir(&folder).unwrap();
     fs::write(folder.join("SKILL.md"), "---\nname: Visible\n---\n").unwrap();
     wait_for(&rx, |state| state.iter().any(|skill| skill.id == "visible"));
+    let new_root = temp.path().join("absent");
+    fs::create_dir(&new_root).unwrap();
+    let new_folder = new_root.join("late");
+    fs::create_dir(&new_folder).unwrap();
+    fs::write(new_folder.join("SKILL.md"), "---\nname: Late arrival\n---\n").unwrap();
+    wait_for(&rx, |state| state.iter().any(|skill| skill.id == "late" && skill.presences[0].agent == Agent::ClaudeCode));
 
     let _guard = watch(&roots[..1], |_| {}).unwrap();
 }
