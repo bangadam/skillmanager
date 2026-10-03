@@ -1,4 +1,5 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
+import { Button } from "@/components/ui/button";
 import { Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
@@ -67,7 +68,7 @@ export function SkillToolbar({ query, setQuery, sort, setSort }: {
   );
 }
 
-export function AllView({ skills, allSkills, query, sort, onRefresh }: { skills: SkillState[]; allSkills: SkillState[]; query: string; sort: SkillSort; onRefresh: (skills: SkillState[]) => void }) {
+export function AllView({ skills, allSkills, query, sort, onRefresh, onUninstall }: { skills: SkillState[]; allSkills: SkillState[]; query: string; sort: SkillSort; onRefresh: (skills: SkillState[]) => void; onUninstall: (skill: SkillState) => void }) {
   const visibleSkills = filterAndSortSkills(skills, query, sort);
   return (
     <section aria-label="Skills">
@@ -90,7 +91,7 @@ export function AllView({ skills, allSkills, query, sort, onRefresh }: { skills:
               <TableHead>Description</TableHead>
               <TableHead className="w-[190px]">Agents</TableHead>
               <TableHead className="w-[135px] text-right">Created</TableHead>
-              <TableHead className="w-[90px] text-right"><span className="sr-only">Actions</span></TableHead>
+              <TableHead className="w-[170px] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -111,7 +112,9 @@ export function AllView({ skills, allSkills, query, sort, onRefresh }: { skills:
                   {skill.date_millis === null ? "—" : new Date(skill.date_millis).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}
                   {skill.date_source === "modified" && <span className="sr-only"> (modified, not created)</span>}
                 </TableCell>
-                <TableCell className="py-5 text-right align-top">{!skill.managed_source && <RenameDialog skill={skill} skills={allSkills} onRefresh={onRefresh} />}</TableCell>
+                <TableCell className="py-5 text-right align-top">
+                  {!skill.managed_source && <><RenameDialog skill={skill} skills={allSkills} onRefresh={onRefresh} /><Button variant="ghost" size="sm" onClick={() => onUninstall(skill)}>Uninstall <span className="sr-only">{skill.name}</span></Button></>}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
