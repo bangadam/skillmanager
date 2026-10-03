@@ -9,8 +9,8 @@ fn scan_skills() -> Result<skillmanager_core::ScanState, String> {
 
 #[tauri::command]
 fn find_duplicates() -> Result<Vec<skillmanager_core::DuplicatePair>, String> {
-    let roots = skillmanager_core::default_roots().map_err(|error| error.to_string())?;
-    skillmanager_core::find_duplicates(&roots).map_err(|error| error.to_string())
+    let state = scan_skills()?;
+    skillmanager_core::find_duplicates(&state.skills).map_err(|error| error.to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

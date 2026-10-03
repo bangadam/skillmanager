@@ -1,4 +1,4 @@
-use crate::{scan, Root, SkillState};
+use crate::SkillState;
 use serde::Serialize;
 use std::{fs, io};
 
@@ -50,8 +50,7 @@ impl Text {
     }
 }
 
-pub fn find_duplicates(roots: &[Root]) -> io::Result<Vec<DuplicatePair>> {
-    let skills = scan(roots)?;
+pub fn find_duplicates(skills: &[SkillState]) -> io::Result<Vec<DuplicatePair>> {
     let texts: Vec<Vec<Text>> = skills.iter().map(|skill| {
         skill.presences.iter().map(|copy| {
             fs::read_to_string(copy.path.join("SKILL.md")).map(|content| Text::new(&content))
