@@ -2,12 +2,16 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import { MissingView } from "@/views/missing";
+import { filterSkills, SkillFilter, type SkillCategory } from "@/components/skill-filter";
 import { AllView, SkillToolbar, type SkillState } from "@/views/all";
 import type { SkillSort } from "@/views/sort-skills";
 import DuplicatesView from "@/views/duplicates";
 
 export default function App() {
   const [skills, setSkills] = useState<SkillState[] | null>(null);
+  const [category, setCategory] = useState<SkillCategory>("all");
+  const [configError, setConfigError] = useState<string | null>(null);
+  const [configNotice, setConfigNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<"all" | "missing" | "duplicates">("all");
   const [query, setQuery] = useState("");
@@ -15,8 +19,8 @@ export default function App() {
 
   useEffect(() => {
     let active = true;
-    invoke<SkillState[]>("scan_skills").then(
-      (result) => { if (active) setSkills(result); },
+    invoke<{ skills: SkillState[]; config_error: string | null; config_notice: string | null }>("scan_skills").then(
+      (result) => { if (active) { setSkills(result.skills); setConfigError(result.config_error); setConfigNotice(result.config_notice); } },
       (reason: unknown) => { if (active) setError(String(reason)); },
     );
     return () => { active = false; };
@@ -29,6 +33,8 @@ export default function App() {
           <p className="mb-3 text-xs font-semibold uppercase tracking-[0.25em] text-muted-foreground">Your skills, across agents</p>
           <h1 className="text-4xl font-semibold tracking-tight">Skill Manager</h1>
         </header>
+        {configError && <p role="alert" className="mb-5 rounded-md border border-destructive p-4 text-destructive">Extra roots config: {configError}</p>}
+        {configNotice && <p role="status" className="mb-5 text-sm text-muted-foreground">{configNotice}</p>}
         <nav aria-label="Skill views" className="mb-6 flex gap-2 border-b border-border pb-3">
           <Button variant={view === "all" ? "default" : "outline"} onClick={() => setView("all")}>All</Button>
           <Button variant={view === "missing" ? "default" : "outline"} onClick={() => setView("missing")}>Missing</Button>
@@ -42,8 +48,11 @@ export default function App() {
           <MissingView skills={skills} onRefresh={setSkills} />
         ) : (
           <>
-            <SkillToolbar query={query} setQuery={setQuery} sort={sort} setSort={setSort} />
-            <AllView skills={skills} query={query} sort={sort} />
+            <div className="mb-5 flex flex-wrap items-center gap-3">
+              <SkillToolbar query={query} setQuery={setQuery} sort={sort} setSort={setSort} />
+              <SkillFilter skills={skills} value={category} onChange={setCategory} />
+            </div>
+            <AllView skills={filterSkills(skills, category)} query={query} sort={sort} />
           </>
         )}
       </div>

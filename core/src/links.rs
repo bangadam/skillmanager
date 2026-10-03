@@ -10,7 +10,7 @@ pub struct LinkEverywhereResult {
 
 pub fn missing<'a>(skills: &'a [SkillState], roots: &[Root]) -> Vec<&'a SkillState> {
     skills.iter().filter(|skill| {
-        !skill.presences.is_empty()
+        skill.managed_source.is_none() && !skill.presences.is_empty()
             && roots.iter().any(|root| !skill.presences.iter().any(|presence| presence.path == root.path.join(&skill.id)))
     }).collect()
 }

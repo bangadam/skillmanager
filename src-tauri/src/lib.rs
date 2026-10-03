@@ -1,24 +1,33 @@
 #[tauri::command]
-fn scan_skills() -> Result<Vec<skillmanager_core::SkillState>, String> {
+fn scan_skills() -> Result<skillmanager_core::ScanState, String> {
     let roots = skillmanager_core::default_roots().map_err(|error| error.to_string())?;
-    skillmanager_core::scan(&roots).map_err(|error| error.to_string())
+    let home = std::env::home_dir().ok_or("home directory unavailable")?;
+    let managed = skillmanager_core::default_managed_roots(&home).map_err(|error| error.to_string())?;
+    skillmanager_core::scan_state(&roots, &skillmanager_core::config_path(&home), &managed)
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
 fn configured_roots() -> Result<Vec<skillmanager_core::Root>, String> {
-    skillmanager_core::default_roots().map_err(|error| error.to_string())
+    let roots = skillmanager_core::default_roots().map_err(|error| error.to_string())?;
+    let home = std::env::home_dir().ok_or("home directory unavailable")?;
+    let (configured, error, _) = skillmanager_core::configured_roots(&roots, &skillmanager_core::config_path(&home));
+    if let Some(error) = error { return Err(error); }
+    Ok(configured)
 }
 
 #[tauri::command]
-fn link_skill(id: String, target_root: String) -> Result<Vec<skillmanager_core::SkillState>, String> {
+fn link_skill(id: String, target_root: String) -> Result<skillmanager_core::ScanState, String> {
     let roots = configured_roots()?;
-    skillmanager_core::link(&roots, &id, std::path::Path::new(&target_root)).map_err(|error| error.to_string())
+    skillmanager_core::link(&roots, &id, std::path::Path::new(&target_root)).map_err(|error| error.to_string())?;
+    scan_skills()
 }
 
 #[tauri::command]
-fn choose_master(id: String, chosen_root: String) -> Result<Vec<skillmanager_core::SkillState>, String> {
+fn choose_master(id: String, chosen_root: String) -> Result<skillmanager_core::ScanState, String> {
     let roots = configured_roots()?;
-    skillmanager_core::choose_master(&roots, &id, std::path::Path::new(&chosen_root)).map_err(|error| error.to_string())
+    skillmanager_core::choose_master(&roots, &id, std::path::Path::new(&chosen_root)).map_err(|error| error.to_string())?;
+    scan_skills()
 }
 
 #[tauri::command]
@@ -29,15 +38,14 @@ fn link_everywhere(id: String) -> Result<skillmanager_core::LinkEverywhereResult
 
 #[tauri::command]
 fn missing_skills() -> Result<Vec<skillmanager_core::SkillState>, String> {
-    let roots = configured_roots()?;
-    let skills = skillmanager_core::scan(&roots).map_err(|error| error.to_string())?;
-    Ok(skillmanager_core::missing(&skills, &roots).into_iter().cloned().collect())
+    let state = scan_skills()?;
+    Ok(skillmanager_core::missing(&state.skills, &state.roots).into_iter().cloned().collect())
 }
 
 #[tauri::command]
 fn find_duplicates() -> Result<Vec<skillmanager_core::DuplicatePair>, String> {
-    let roots = skillmanager_core::default_roots().map_err(|error| error.to_string())?;
-    skillmanager_core::find_duplicates(&roots).map_err(|error| error.to_string())
+    let state = scan_skills()?;
+    skillmanager_core::find_duplicates(&state.skills).map_err(|error| error.to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

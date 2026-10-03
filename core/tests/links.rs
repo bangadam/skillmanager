@@ -1,4 +1,4 @@
-use skillmanager_core::{choose_master_in, link, link_everywhere, missing, scan, Agent, PresenceKind, Root};
+use skillmanager_core::{choose_master_in, link, link_everywhere, missing, scan, scan_state, Agent, ManagedKind, ManagedRoot, PresenceKind, Root};
 use std::{fs, os::unix::fs::symlink, path::Path};
 
 fn roots(base: &Path) -> Vec<Root> {
@@ -112,3 +112,38 @@ fn missing_counts_all_configured_roots_and_link_everywhere_reports_partial_failu
     assert_eq!(result.skills[0].presences.len(), 3);
     assert!(fs::symlink_metadata(roots[3].path.join("alpha")).unwrap().is_dir());
 }
+
+#[test]
+fn missing_uses_extra_roots_and_excludes_managed_skills() {
+    let temp = tempfile::tempdir().unwrap();
+    let roots = roots(temp.path());
+    let extra = temp.path().join("extra");
+    let plugin = temp.path().join("plugin");
+    skill(&roots[0], "alpha", "owned");
+    skill(&roots[1], "alpha", "owned");
+    skill(&Root { agent: Agent::Omp, path: plugin.clone() }, "plugin-only", "plugin");
+    let config = temp.path().join("roots.json");
+    fs::write(&config, format!(r#"[{{"agent":"codex","path":"{}"}}]"#, extra.display())).unwrap();
+    let state = scan_state(&roots, &config, &[ManagedRoot { agent: Agent::Omp, path: plugin, kind: ManagedKind::Plugin, plugin: None }]).unwrap();
+    assert_eq!(state.roots.len(), 5);
+    let gaps = missing(&state.skills, &state.roots);
+    assert_eq!(gaps.len(), 1);
+    assert_eq!(gaps[0].id, "alpha");
+    assert!(!gaps.iter().any(|skill| skill.managed_source.is_some()));
+}
+
+#[test]
+fn linking_everywhere_uses_extra_root_from_config() {
+    let temp = tempfile::tempdir().unwrap();
+    let roots = roots(temp.path());
+    skill(&roots[0], "alpha", "body");
+    let extra = temp.path().join("extra");
+    let config = temp.path().join("roots.json");
+    fs::write(&config, format!(r#"[{{"agent":"cursor","path":"{}"}}]"#, extra.display())).unwrap();
+    let state = scan_state(&roots, &config, &[]).unwrap();
+    let result = link_everywhere(&state.roots, "alpha").unwrap();
+    assert!(result.failures.is_empty());
+    assert_eq!(result.skills[0].presences.len(), 5);
+    assert_eq!(fs::read_link(extra.join("alpha")).unwrap(), roots[0].path.join("alpha"));
+}
+

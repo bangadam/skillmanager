@@ -44,15 +44,15 @@ export function MissingView({ skills, onRefresh }: { skills: MissingSkill[]; onR
     setError(null);
     try {
       if (real.length > 1) await invoke("choose_master", { id: choice.skill.id, chosenRoot: master });
-      const result = choice.everywhere
-        ? await invoke<{ skills: MissingSkill[]; failures: string[] }>("link_everywhere", { id: choice.skill.id })
-        : { skills: await invoke<MissingSkill[]>("link_skill", { id: choice.skill.id, targetRoot: target }), failures: [] };
-      onRefresh(result.skills);
-      if (result.failures.length) setError(`Some roots could not be linked: ${result.failures.join("; ")}`);
+      const failures = choice.everywhere
+        ? (await invoke<{ failures: string[] }>("link_everywhere", { id: choice.skill.id })).failures
+        : (await invoke("link_skill", { id: choice.skill.id, targetRoot: target }), []);
+      onRefresh((await invoke<{ skills: MissingSkill[] }>("scan_skills")).skills);
+      if (failures.length) setError(`Some roots could not be linked: ${failures.join("; ")}`);
       else setChoice(null);
     } catch (reason) {
       // A master selection may already have linkified duplicates; refresh even when the next step fails.
-      try { onRefresh(await invoke<MissingSkill[]>("scan_skills")); } catch { /* Show the operation error first. */ }
+      try { onRefresh((await invoke<{ skills: MissingSkill[] }>("scan_skills")).skills); } catch { /* Show the operation error first. */ }
       setError(String(reason));
     } finally { setBusy(false); }
   };
