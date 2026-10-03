@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { MissingView } from "@/views/missing";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -26,6 +28,7 @@ const agentLabels: Record<Agent, { short: string; long: string }> = {
 export default function App() {
   const [skills, setSkills] = useState<SkillState[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<"all" | "missing">("all");
 
   useEffect(() => {
     let active = true;
@@ -48,10 +51,13 @@ export default function App() {
             {skills === null ? "Scanning…" : `${skills.length} ${skills.length === 1 ? "skill" : "skills"}`}
           </p>
         </header>
+        <nav aria-label="Skill views" className="mb-6 flex gap-2"><Button variant={view === "all" ? "default" : "outline"} onClick={() => setView("all")}>All</Button><Button variant={view === "missing" ? "default" : "outline"} onClick={() => setView("missing")}>Missing</Button></nav>
         {error ? (
           <p role="alert" className="rounded-md border border-destructive p-5 text-destructive">Could not scan skills: {error}</p>
         ) : skills === null ? (
           <p role="status" className="py-12 text-muted-foreground">Scanning skill folders…</p>
+        ) : view === "missing" ? (
+          <MissingView skills={skills} onRefresh={setSkills} />
         ) : skills.length === 0 ? (
           <p className="rounded-md border border-dashed border-border py-16 text-center text-muted-foreground">No skills found in your agent folders.</p>
         ) : (

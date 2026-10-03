@@ -1,3 +1,6 @@
+mod links;
+pub use links::{choose_master, choose_master_in, link, link_everywhere, missing, LinkEverywhereResult};
+
 use gray_matter::{engine::YAML, Matter};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -16,7 +19,7 @@ pub enum Agent {
     Omp,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Root {
     pub agent: Agent,
     pub path: PathBuf,
