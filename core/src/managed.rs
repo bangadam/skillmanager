@@ -21,7 +21,7 @@ pub struct ManagedRoot {
     pub plugin: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 pub struct ScanState {
     pub skills: Vec<SkillState>,
     pub config_error: Option<String>,

@@ -1,5 +1,7 @@
 mod links;
 pub use links::{choose_master, choose_master_in, link, link_everywhere, missing, LinkEverywhereResult};
+mod watch;
+pub use watch::{watch, WatchGuard};
 mod managed;
 mod duplicates;
 pub use managed::{config_path, configured_roots, default_managed_roots, scan_state, ManagedKind, ManagedRoot, ManagedSource, ScanState};

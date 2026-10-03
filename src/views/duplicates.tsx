@@ -28,18 +28,19 @@ function Copies({ skill }: { skill: Skill }) {
   );
 }
 
-export default function DuplicatesView({ onGoToMissing }: { onGoToMissing?: () => void }) {
+export default function DuplicatesView({ skills, onGoToMissing }: { skills: unknown[] | null; onGoToMissing?: () => void }) {
   const [pairs, setPairs] = useState<Pair[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!skills) return;
     let active = true;
     invoke<Pair[]>("find_duplicates").then(
-      (result) => { if (active) setPairs(result); },
+      (result) => { if (active) { setPairs(result); setError(null); } },
       (reason: unknown) => { if (active) setError(String(reason)); },
     );
     return () => { active = false; };
-  }, []);
+  }, [skills]);
 
   if (error) return <p role="alert" className="rounded-md border border-destructive p-5 text-destructive">Could not find duplicates: {error}</p>;
   if (!pairs) return <p role="status" className="py-12 text-muted-foreground">Comparing skill files…</p>;
