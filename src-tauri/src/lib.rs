@@ -52,6 +52,15 @@ fn link_everywhere(id: String) -> Result<skillmanager_core::LinkEverywhereResult
 }
 
 #[tauri::command]
+fn rename_skill(id: String, new_name: String) -> Result<skillmanager_core::ScanState, String> {
+    let roots = configured_roots()?;
+    let home = std::env::home_dir().ok_or("home directory unavailable")?;
+    let journal = skillmanager_core::config_path(&home).with_file_name("renames.json");
+    skillmanager_core::rename(&roots, &id, &new_name, &journal).map_err(|error| error.to_string())?;
+    scan_skills()
+}
+
+#[tauri::command]
 fn missing_skills() -> Result<Vec<skillmanager_core::SkillState>, String> {
     let state = scan_skills()?;
     Ok(skillmanager_core::missing(&state.skills, &state.roots).into_iter().cloned().collect())
@@ -102,7 +111,7 @@ pub fn run() {
             })?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![scan_skills, find_duplicates, configured_roots, link_skill, choose_master, link_everywhere, missing_skills, skill_diff, replace_with_link])
+        .invoke_handler(tauri::generate_handler![scan_skills, find_duplicates, configured_roots, link_skill, choose_master, link_everywhere, missing_skills, rename_skill, skill_diff, replace_with_link])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

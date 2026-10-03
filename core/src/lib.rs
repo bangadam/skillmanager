@@ -1,5 +1,7 @@
 mod divergence;
 pub use divergence::{replace_with_link, replace_with_link_in, skill_diff, DivergentPair, SkillDiff};
+mod rename;
+pub use rename::rename;
 mod links;
 pub use links::{choose_master, choose_master_in, link, link_everywhere, missing, LinkEverywhereResult};
 mod watch;

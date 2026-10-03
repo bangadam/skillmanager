@@ -44,7 +44,7 @@ export default function App() {
               <SkillToolbar query={query} setQuery={setQuery} sort={sort} setSort={setSort} />
               <SkillFilter skills={skills} value={category} onChange={setCategory} />
             </div>
-            <AllView skills={filterSkills(skills, category)} query={query} sort={sort} onDiff={setDiffSkill} />
+            <AllView skills={filterSkills(skills, category)} allSkills={skills} query={query} sort={sort} onRefresh={setSkills} onDiff={setDiffSkill} />
           </>
         )}
         <DivergenceDialog skill={diffSkill && skills?.find((skill) => skill.id === diffSkill.id && !skill.managed_source) || null} onClose={() => setDiffSkill(null)} onRefresh={setSkills} />
