@@ -3,6 +3,7 @@ import { Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
+import { RenameDialog } from "@/components/rename-dialog";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -66,7 +67,7 @@ export function SkillToolbar({ query, setQuery, sort, setSort }: {
   );
 }
 
-export function AllView({ skills, query, sort }: { skills: SkillState[]; query: string; sort: SkillSort }) {
+export function AllView({ skills, allSkills, query, sort, onRefresh }: { skills: SkillState[]; allSkills: SkillState[]; query: string; sort: SkillSort; onRefresh: (skills: SkillState[]) => void }) {
   const visibleSkills = filterAndSortSkills(skills, query, sort);
   return (
     <section aria-label="Skills">
@@ -89,6 +90,7 @@ export function AllView({ skills, query, sort }: { skills: SkillState[]; query: 
               <TableHead>Description</TableHead>
               <TableHead className="w-[190px]">Agents</TableHead>
               <TableHead className="w-[135px] text-right">Created</TableHead>
+              <TableHead className="w-[90px] text-right"><span className="sr-only">Actions</span></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -109,6 +111,7 @@ export function AllView({ skills, query, sort }: { skills: SkillState[]; query: 
                   {skill.date_millis === null ? "—" : new Date(skill.date_millis).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}
                   {skill.date_source === "modified" && <span className="sr-only"> (modified, not created)</span>}
                 </TableCell>
+                <TableCell className="py-5 text-right align-top">{!skill.managed_source && <RenameDialog skill={skill} skills={allSkills} onRefresh={onRefresh} />}</TableCell>
               </TableRow>
             ))}
           </TableBody>

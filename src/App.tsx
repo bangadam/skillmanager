@@ -41,7 +41,7 @@ export default function App() {
               <SkillToolbar query={query} setQuery={setQuery} sort={sort} setSort={setSort} />
               <SkillFilter skills={skills} value={category} onChange={setCategory} />
             </div>
-            <AllView skills={filterSkills(skills, category)} query={query} sort={sort} />
+            <AllView skills={filterSkills(skills, category)} allSkills={skills} query={query} sort={sort} onRefresh={setSkills} />
           </>
         )}
       </div>
