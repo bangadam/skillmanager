@@ -14,5 +14,5 @@ Vocabulary for skillmanager. Use these terms in issues, specs, and tests.
 - **Duplicates view** — the pairing of text-similar skills (no AI in v1).
 - **Plugin skill / built-in skill** — skills managed by an agent's own plugin or system machinery. Displayed read-only; never linked, edited, renamed, or uninstalled by the app.
 - **Scan** — reading all roots to derive the full state. State is always derived from disk, never persisted.
-- **Rename journal** — the app-owned record of renames (old name → new name, timestamp), kept so that future usage attribution survives renames.
+- **Rename journal** — the app-owned `~/.config/skillmanager/renames.json` array of `{from, to, at}` entries (`at` is Unix seconds), kept so future usage attribution survives renames. Missing means empty history.
 - **Usage event** (v1.5) — an explicit skill invocation recorded in a chat transcript (Claude Code `Skill` tool events; omp `skill://` reads). Advertised catalogs and prompt mentions never count.
