@@ -1,5 +1,7 @@
 mod managed;
+mod duplicates;
 pub use managed::{config_path, configured_roots, default_managed_roots, scan_state, ManagedKind, ManagedRoot, ManagedSource, ScanState};
+pub use duplicates::{find_duplicates, DuplicatePair};
 
 use gray_matter::{engine::YAML, Matter};
 use serde::{Deserialize, Serialize};
