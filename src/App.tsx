@@ -6,6 +6,8 @@ import { filterSkills, SkillFilter, type SkillCategory } from "@/components/skil
 import { AllView, SkillToolbar } from "@/views/all";
 import type { SkillSort } from "@/views/sort-skills";
 import DuplicatesView from "@/views/duplicates";
+import { UninstallDialog } from "@/components/uninstall-dialog";
+import type { SkillState } from "@/views/all";
 
 export default function App() {
   const { skills, setSkills, error, configError, configNotice } = useSkills();
@@ -13,6 +15,7 @@ export default function App() {
   const [view, setView] = useState<"all" | "missing" | "duplicates">("all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SkillSort>("created-desc");
+  const [uninstallSkill, setUninstallSkill] = useState<SkillState | null>(null);
 
 
   return (
@@ -41,9 +44,10 @@ export default function App() {
               <SkillToolbar query={query} setQuery={setQuery} sort={sort} setSort={setSort} />
               <SkillFilter skills={skills} value={category} onChange={setCategory} />
             </div>
-            <AllView skills={filterSkills(skills, category)} query={query} sort={sort} />
+            <AllView skills={filterSkills(skills, category)} query={query} sort={sort} onUninstall={setUninstallSkill} />
           </>
         )}
+        <UninstallDialog skill={uninstallSkill} onClose={() => setUninstallSkill(null)} onRefresh={setSkills} />
       </div>
     </main>
   );

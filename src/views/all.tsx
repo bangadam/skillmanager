@@ -1,4 +1,5 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
+import { Button } from "@/components/ui/button";
 import { Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
@@ -66,7 +67,7 @@ export function SkillToolbar({ query, setQuery, sort, setSort }: {
   );
 }
 
-export function AllView({ skills, query, sort }: { skills: SkillState[]; query: string; sort: SkillSort }) {
+export function AllView({ skills, query, sort, onUninstall }: { skills: SkillState[]; query: string; sort: SkillSort; onUninstall: (skill: SkillState) => void }) {
   const visibleSkills = filterAndSortSkills(skills, query, sort);
   return (
     <section aria-label="Skills">
@@ -89,6 +90,7 @@ export function AllView({ skills, query, sort }: { skills: SkillState[]; query: 
               <TableHead>Description</TableHead>
               <TableHead className="w-[190px]">Agents</TableHead>
               <TableHead className="w-[135px] text-right">Created</TableHead>
+              <TableHead className="w-[100px] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -108,6 +110,9 @@ export function AllView({ skills, query, sort }: { skills: SkillState[]; query: 
                 <TableCell className="py-5 text-right align-top text-sm tabular-nums text-muted-foreground" title={skill.date_source === "modified" ? "Creation date unavailable; showing modified date" : undefined}>
                   {skill.date_millis === null ? "—" : new Date(skill.date_millis).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}
                   {skill.date_source === "modified" && <span className="sr-only"> (modified, not created)</span>}
+                </TableCell>
+                <TableCell className="py-5 text-right align-top">
+                  {!skill.managed_source && <Button variant="ghost" size="sm" onClick={() => onUninstall(skill)}>Uninstall <span className="sr-only">{skill.name}</span></Button>}
                 </TableCell>
               </TableRow>
             ))}

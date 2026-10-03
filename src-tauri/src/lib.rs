@@ -50,6 +50,33 @@ fn find_duplicates() -> Result<Vec<skillmanager_core::DuplicatePair>, String> {
     skillmanager_core::find_duplicates(&state.skills).map_err(|error| error.to_string())
 }
 
+fn uninstall_target(state: &skillmanager_core::ScanState, source_path: &str) -> Result<skillmanager_core::SkillState, String> {
+    state.skills.iter().find(|skill| skill.presences.iter().any(|presence| presence.path == std::path::Path::new(source_path)))
+        .cloned().ok_or_else(|| "Skill is no longer available; refresh and try again".into())
+}
+
+fn uninstall_scope(root: Option<String>) -> skillmanager_core::UninstallScope {
+    root.map(|path| skillmanager_core::UninstallScope::Root(path.into())).unwrap_or(skillmanager_core::UninstallScope::Everywhere)
+}
+
+#[tauri::command]
+fn plan_uninstall(source_path: String, root: Option<String>) -> Result<skillmanager_core::UninstallPlan, String> {
+    let state = scan_skills()?;
+    let skill = uninstall_target(&state, &source_path)?;
+    skillmanager_core::plan_uninstall(&state.roots, &skill, uninstall_scope(root)).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn uninstall_skill(source_path: String, root: Option<String>, expected_actions: Vec<skillmanager_core::UninstallAction>) -> Result<skillmanager_core::ScanState, String> {
+    let state = scan_skills()?;
+    let skill = uninstall_target(&state, &source_path)?;
+    let scope = uninstall_scope(root);
+    let current = skillmanager_core::plan_uninstall(&state.roots, &skill, scope.clone()).map_err(|error| error.to_string())?;
+    if current.actions != expected_actions { return Err("Affected paths changed; review the plan again before uninstalling".into()); }
+    skillmanager_core::uninstall(&state.roots, &skill, scope).map_err(|error| error.to_string())?;
+    scan_skills()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -89,7 +116,7 @@ pub fn run() {
             })?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![scan_skills, find_duplicates, configured_roots, link_skill, choose_master, link_everywhere, missing_skills])
+        .invoke_handler(tauri::generate_handler![scan_skills, find_duplicates, configured_roots, link_skill, choose_master, link_everywhere, missing_skills, plan_uninstall, uninstall_skill])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
