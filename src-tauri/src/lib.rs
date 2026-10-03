@@ -83,10 +83,6 @@ fn find_duplicates() -> Result<Vec<skillmanager_core::DuplicatePair>, String> {
     skillmanager_core::find_duplicates(&state.skills).map_err(|error| error.to_string())
 }
 
-fn uninstall_target(state: &skillmanager_core::ScanState, source_path: &str) -> Result<skillmanager_core::SkillState, String> {
-    state.skills.iter().find(|skill| skill.presences.iter().any(|presence| presence.path == std::path::Path::new(source_path)))
-        .cloned().ok_or_else(|| "Skill is no longer available; refresh and try again".into())
-}
 
 fn uninstall_scope(root: Option<String>) -> skillmanager_core::UninstallScope {
     root.map(|path| skillmanager_core::UninstallScope::Root(path.into())).unwrap_or(skillmanager_core::UninstallScope::Everywhere)
@@ -95,18 +91,13 @@ fn uninstall_scope(root: Option<String>) -> skillmanager_core::UninstallScope {
 #[tauri::command]
 fn plan_uninstall(source_path: String, root: Option<String>) -> Result<skillmanager_core::UninstallPlan, String> {
     let state = scan_skills()?;
-    let skill = uninstall_target(&state, &source_path)?;
-    skillmanager_core::plan_uninstall(&state.roots, &skill, uninstall_scope(root)).map_err(|error| error.to_string())
+    skillmanager_core::plan_uninstall_source(&state.roots, std::path::Path::new(&source_path), uninstall_scope(root)).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
 fn uninstall_skill(source_path: String, root: Option<String>, expected_actions: Vec<skillmanager_core::UninstallAction>) -> Result<skillmanager_core::ScanState, String> {
     let state = scan_skills()?;
-    let skill = uninstall_target(&state, &source_path)?;
-    let scope = uninstall_scope(root);
-    let current = skillmanager_core::plan_uninstall(&state.roots, &skill, scope.clone()).map_err(|error| error.to_string())?;
-    if current.actions != expected_actions { return Err("Affected paths changed; review the plan again before uninstalling".into()); }
-    skillmanager_core::uninstall(&state.roots, &skill, scope).map_err(|error| error.to_string())?;
+    skillmanager_core::uninstall_confirmed(&state.roots, std::path::Path::new(&source_path), uninstall_scope(root), &expected_actions).map_err(|error| error.to_string())?;
     scan_skills()
 }
 
@@ -125,22 +116,9 @@ pub fn run() {
                     None => { eprintln!("skill watcher: home directory unavailable"); return; }
                 };
                 let config = skillmanager_core::config_path(&home);
-                let (watch_roots, config_error, _) = skillmanager_core::configured_roots(&roots, &config);
-                if let Some(error) = config_error { eprintln!("skill watcher config: {error}"); }
-                // ponytail: managed/plugin caches are read-only display and aren't watched;
-                // watch them if external managed-cache updates must appear without another event.
-                match skillmanager_core::watch(&watch_roots, move |_| {
-                    let managed = match skillmanager_core::default_managed_roots(&home) {
-                        Ok(managed) => managed,
-                        Err(error) => { eprintln!("skill watcher managed roots: {error}"); return; }
-                    };
-                    match skillmanager_core::scan_state(&roots, &config, &managed) {
-                        Ok(state) => {
-                            if let Err(error) = handle.emit("skills-changed", state) {
-                                eprintln!("skill watcher emit: {error}");
-                            }
-                        }
-                        Err(error) => eprintln!("skill watcher full rescan: {error}"),
+                match skillmanager_core::watch(&roots, &config, &home, move |state| {
+                    if let Err(error) = handle.emit("skills-changed", state) {
+                        eprintln!("skill watcher emit: {error}");
                     }
                 }) {
                     Ok(_guard) => loop { std::thread::park(); },

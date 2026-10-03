@@ -1,6 +1,6 @@
-use crate::{scan, PresenceKind, Root, SkillState};
+use crate::{find_skill, markdown, scan, PresenceKind, Root, SkillState};
 use serde::Serialize;
-use std::{fs, io, path::{Path, PathBuf}};
+use std::{fs, io, path::PathBuf};
 
 #[derive(Debug, Serialize)]
 pub struct EditResult {
@@ -8,21 +8,13 @@ pub struct EditResult {
     pub files_written: Vec<PathBuf>,
 }
 
-fn markdown(path: &Path) -> io::Result<Option<String>> {
-    match fs::read_to_string(path.join("SKILL.md")) {
-        Ok(text) => Ok(Some(text)),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
-        Err(error) => Err(error),
-    }
-}
 
 fn master(roots: &[Root], id: &str) -> io::Result<(SkillState, PathBuf)> {
-    let skill = scan(roots)?.into_iter().find(|skill| skill.id == id)
-        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, format!("No skill {id:?} in configured roots")))?;
-    // ponytail: scan only exposes skills with SKILL.md somewhere; choose the first real copy with text so a visible skill never opens a missing copy as blank.
-    let path = skill.presences.iter().filter(|copy| copy.kind == PresenceKind::RealDir)
-        .find(|copy| copy.path.join("SKILL.md").is_file())
-        .ok_or_else(|| io::Error::other(format!("{id} has no real master SKILL.md in configured roots")))?.path.clone();
+    let skill = find_skill(roots, id)?;
+    // ponytail: root order picks the master even if its markdown is missing; linking still requires explicit selection.
+    let path = roots.iter().find_map(|root| skill.presences.iter()
+        .find(|copy| copy.path == root.path.join(id) && copy.kind == PresenceKind::RealDir))
+        .ok_or_else(|| io::Error::other(format!("{id} has no real master in configured roots")))?.path.clone();
     Ok((skill, path))
 }
 
@@ -36,10 +28,12 @@ pub fn edit_skill(roots: &[Root], id: &str, new_content: &str) -> io::Result<Edi
     let original = markdown(&master_path)?;
     let mut files_written = Vec::new();
     let mut divergent_roots = Vec::new();
-    for copy in &skill.presences {
-        if markdown(&copy.path)? != original {
+    for root in roots {
+        let Some(copy) = skill.presences.iter().find(|copy| copy.path == root.path.join(id)) else { continue };
+        let content = markdown(&copy.path)?;
+        if content != original && !(original.is_none() && content.as_deref() == Some("")) {
             divergent_roots.push(copy.path.parent().unwrap().display().to_string());
-        } else if copy.kind == PresenceKind::RealDir {
+        } else if copy.kind == PresenceKind::RealDir && (copy.path == master_path || content.is_some()) {
             files_written.push(copy.path.join("SKILL.md"));
         }
     }

@@ -12,6 +12,21 @@ fn pairs(roots: &[Root]) -> Vec<skillmanager_core::DuplicatePair> {
 }
 
 #[test]
+fn missing_markdown_in_one_copy_does_not_hide_other_duplicate_pairs() {
+    let temp = tempfile::tempdir().unwrap();
+    let first = temp.path().join("first");
+    let second = temp.path().join("second");
+    skill(&first, "alpha", "same content");
+    fs::create_dir_all(second.join("alpha")).unwrap();
+    skill(&second, "beta", "same content");
+    let roots = [Root { agent: Agent::Codex, path: first }, Root { agent: Agent::Cursor, path: second }];
+    let found = pairs(&roots);
+    assert_eq!(found.len(), 1);
+    assert_eq!((&found[0].a.id[..], &found[0].b.id[..]), ("alpha", "beta"));
+    assert!(found[0].is_exact);
+}
+
+#[test]
 fn pairs_exact_text_across_different_names_and_lists_each_copy() {
     let temp = tempfile::tempdir().unwrap();
     let claude = temp.path().join("claude");

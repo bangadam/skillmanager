@@ -17,6 +17,15 @@ pub enum UninstallAction {
 #[derive(Debug, Serialize)]
 pub struct UninstallPlan { pub actions: Vec<UninstallAction> }
 
+fn uninstall_target(roots: &[Root], source: &Path) -> io::Result<SkillState> {
+    scan(roots)?.into_iter().find(|skill| skill.presences.iter().any(|copy| copy.path == source))
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Skill is no longer available; refresh and try again"))
+}
+
+pub fn plan_uninstall_source(roots: &[Root], source: &Path, scope: UninstallScope) -> io::Result<UninstallPlan> {
+    plan_uninstall(roots, &uninstall_target(roots, source)?, scope)
+}
+
 pub fn plan_uninstall(roots: &[Root], skill: &SkillState, scope: UninstallScope) -> io::Result<UninstallPlan> {
     if skill.managed_source.is_some() {
         return Err(io::Error::new(io::ErrorKind::PermissionDenied, "Cannot uninstall a managed plugin or built-in skill"));
@@ -87,6 +96,20 @@ pub fn uninstall_with(roots: &[Root], skill: &SkillState, scope: UninstallScope,
         }
     }
     scan(roots)
+}
+
+pub fn uninstall_confirmed(roots: &[Root], source: &Path, scope: UninstallScope, expected: &[UninstallAction]) -> io::Result<Vec<SkillState>> {
+    uninstall_confirmed_with(roots, source, scope, expected, |path| trash::delete(path).map_err(io::Error::other))
+}
+
+// ponytail: the fixture hook keeps plan confirmation at the core seam while production uses system Trash.
+pub fn uninstall_confirmed_with(roots: &[Root], source: &Path, scope: UninstallScope, expected: &[UninstallAction], trash: impl FnMut(&Path) -> io::Result<()>) -> io::Result<Vec<SkillState>> {
+    let skill = uninstall_target(roots, source)?;
+    let current = plan_uninstall(roots, &skill, scope.clone())?;
+    if current.actions != expected {
+        return Err(io::Error::other("Affected paths changed; review the plan again before uninstalling"));
+    }
+    uninstall_with(roots, &skill, scope, trash)
 }
 
 fn spare_path(path: &Path) -> io::Result<PathBuf> {

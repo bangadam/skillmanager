@@ -1,4 +1,4 @@
-use crate::{scan, PresenceKind, Root, SkillState};
+use crate::{find_skill, scan, PresenceKind, Root, SkillState};
 use std::{collections::BTreeMap, fs, io, os::unix::fs::symlink, path::{Path, PathBuf}};
 use serde::Serialize;
 
@@ -15,10 +15,6 @@ pub fn missing<'a>(skills: &'a [SkillState], roots: &[Root]) -> Vec<&'a SkillSta
     }).collect()
 }
 
-fn find_skill(roots: &[Root], id: &str) -> io::Result<SkillState> {
-    scan(roots)?.into_iter().find(|skill| skill.id == id)
-        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, format!("Skill {id:?} is not in a configured root")))
-}
 
 fn root<'a>(roots: &'a [Root], path: &Path) -> io::Result<&'a Root> {
     roots.iter().find(|root| root.path == path)
@@ -57,13 +53,18 @@ pub fn link(roots: &[Root], id: &str, target_root: &Path) -> io::Result<Vec<Skil
 
 pub fn link_everywhere(roots: &[Root], id: &str) -> io::Result<LinkEverywhereResult> {
     let skill = find_skill(roots, id)?;
-    master(&skill)?;
+    let source = master(&skill)?;
     let mut failures = Vec::new();
     for root in roots {
-        if skill.presences.iter().any(|presence| presence.path == root.path.join(id)) { continue; }
-        if let Err(error) = link(roots, id, &root.path) {
-            failures.push(format!("{}: {error}", root.path.display()));
-        }
+        let destination = root.path.join(id);
+        if skill.presences.iter().any(|presence| presence.path == destination) { continue; }
+        let result = match fs::symlink_metadata(&destination) {
+            Ok(_) => Err(io::Error::new(io::ErrorKind::AlreadyExists, format!("{} already holds a copy of {id}", destination.display()))),
+            Err(error) if error.kind() == io::ErrorKind::NotFound =>
+                fs::create_dir_all(&root.path).and_then(|_| symlink(&source, &destination)),
+            Err(error) => Err(error),
+        };
+        if let Err(error) = result { failures.push(format!("{}: {error}", root.path.display())); }
     }
     Ok(LinkEverywhereResult { skills: scan(roots)?, failures })
 }

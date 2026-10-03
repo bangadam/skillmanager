@@ -71,15 +71,32 @@ fn empty_content_is_saved_and_missing_copy_is_guarded() {
 }
 
 #[test]
-fn visible_skill_with_missing_first_copy_opens_existing_markdown() {
+fn visible_skill_with_missing_first_copy_reads_empty_and_guards_existing_content() {
     let temp = tempfile::tempdir().unwrap();
     let roots = roots(temp.path());
     copy(&roots[0], None);
     copy(&roots[1], Some("available"));
-    assert_eq!(read_skill_md(&roots, "alpha").unwrap(), "available");
+    assert_eq!(read_skill_md(&roots, "alpha").unwrap(), "");
     let error = edit_skill(&roots, "alpha", "new").unwrap_err();
-    assert!(error.to_string().contains(&roots[0].path.display().to_string()));
+    assert!(error.to_string().contains(&roots[1].path.display().to_string()));
     assert_eq!(fs::read_to_string(roots[1].path.join("alpha/SKILL.md")).unwrap(), "available");
+}
+
+#[test]
+fn missing_master_markdown_is_created_when_other_copies_are_empty() {
+    let temp = tempfile::tempdir().unwrap();
+    let roots = roots(temp.path());
+    copy(&roots[0], Some("existing"));
+    copy(&roots[1], None);
+    fs::remove_file(roots[0].path.join("alpha/SKILL.md")).unwrap();
+    // An entirely missing skill is deliberately invisible until one copy has SKILL.md.
+    assert!(scan(&roots).unwrap().is_empty());
+    copy(&roots[2], Some(""));
+    assert_eq!(read_skill_md(&roots, "alpha").unwrap(), "");
+    let result = edit_skill(&roots, "alpha", "created").unwrap();
+    assert_eq!(result.files_written, vec![roots[0].path.join("alpha/SKILL.md"), roots[2].path.join("alpha/SKILL.md")]);
+    assert_eq!(fs::read_to_string(roots[0].path.join("alpha/SKILL.md")).unwrap(), "created");
+    assert!(!roots[1].path.join("alpha/SKILL.md").exists());
 }
 
 #[test]

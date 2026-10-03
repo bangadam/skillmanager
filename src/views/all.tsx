@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { RenameDialog } from "@/components/rename-dialog";
+import { CopyAudit } from "@/components/copy-audit";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -69,7 +70,7 @@ export function SkillToolbar({ query, setQuery, sort, setSort }: {
   );
 }
 
-export function AllView({ skills, allSkills, query, sort, onRefresh, onDiff, onUninstall, onEdit }: { skills: SkillState[]; allSkills: SkillState[]; query: string; sort: SkillSort; onRefresh: (skills: SkillState[]) => void; onDiff?: (skill: SkillState) => void; onUninstall: (skill: SkillState) => void; onEdit: (skill: SkillState) => void }) {
+export function AllView({ skills, allSkills, query, sort, onRefresh, onDiff, onUninstall, onEdit, onConsolidate }: { skills: SkillState[]; allSkills: SkillState[]; query: string; sort: SkillSort; onRefresh: (skills: SkillState[]) => void; onDiff?: (skill: SkillState) => void; onUninstall: (skill: SkillState) => void; onEdit: (skill: SkillState) => void; onConsolidate: (skill: SkillState) => void }) {
   const visibleSkills = filterAndSortSkills(skills, query, sort);
   return (
     <section aria-label="Skills">
@@ -98,7 +99,7 @@ export function AllView({ skills, allSkills, query, sort, onRefresh, onDiff, onU
           <TableBody>
             {visibleSkills.map((skill) => (
               <TableRow key={`${skill.managed_source?.kind ?? "mine"}:${skill.managed_source?.agent ?? ""}:${skill.managed_source?.plugin ?? ""}:${skill.presences[0]?.path ?? skill.id}`} className={skill.managed_source ? "text-muted-foreground" : undefined}>
-                <TableCell className="py-5 align-top font-medium">{skill.name}{skill.divergent_pairs?.length > 0 && <button type="button" className="ml-2 rounded border border-amber-600/50 px-2 py-0.5 text-xs text-amber-700 hover:bg-amber-100 focus-visible:outline-2 dark:text-amber-400 dark:hover:bg-amber-950" onClick={() => onDiff?.(skill)}>⚠ Divergent · Review diff</button>}{skill.managed_source && <span className="block text-xs font-normal">{skill.managed_source.kind === "plugin" ? `Plugin${skill.managed_source.plugin ? ` · ${skill.managed_source.plugin}` : ""}` : "Built-in"}</span>}</TableCell>
+                <TableCell className="py-5 align-top font-medium">{skill.name}{skill.divergent_pairs?.length > 0 && <button type="button" className="ml-2 rounded border border-amber-600/50 px-2 py-0.5 text-xs text-amber-700 hover:bg-amber-100 focus-visible:outline-2 dark:text-amber-400 dark:hover:bg-amber-950" onClick={() => onDiff?.(skill)}>⚠ Divergent · Review diff</button>}{skill.managed_source && <span className="block text-xs font-normal">{skill.managed_source.kind === "plugin" ? `Plugin${skill.managed_source.plugin ? ` · ${skill.managed_source.plugin}` : ""}` : "Built-in"}</span>}<CopyAudit skill={skill} /></TableCell>
                 <TableCell className="py-5 align-top text-muted-foreground">{skill.description || "—"}</TableCell>
                 <TableCell className="py-5 align-top">
                   <div className="flex flex-wrap gap-1.5">
@@ -114,7 +115,7 @@ export function AllView({ skills, allSkills, query, sort, onRefresh, onDiff, onU
                   {skill.date_source === "modified" && <span className="sr-only"> (modified, not created)</span>}
                 </TableCell>
                 <TableCell className="py-5 text-right align-top">
-                  {!skill.managed_source && <><Button variant="ghost" size="sm" onClick={() => onEdit(skill)}>Edit <span className="sr-only">{skill.name}</span></Button><RenameDialog skill={skill} skills={allSkills} onRefresh={onRefresh} /><Button variant="ghost" size="sm" onClick={() => onUninstall(skill)}>Uninstall <span className="sr-only">{skill.name}</span></Button></>}
+                  {!skill.managed_source && <>{skill.presences.filter((copy) => copy.kind === "real_dir").length > 1 && <Button variant="ghost" size="sm" onClick={() => onConsolidate(skill)}>Consolidate copies <span className="sr-only">of {skill.name}</span></Button>}<Button variant="ghost" size="sm" onClick={() => onEdit(skill)}>Edit <span className="sr-only">{skill.name}</span></Button><RenameDialog skill={skill} skills={allSkills} onRefresh={onRefresh} /><Button variant="ghost" size="sm" onClick={() => onUninstall(skill)}>Uninstall <span className="sr-only">{skill.name}</span></Button></>}
                 </TableCell>
               </TableRow>
             ))}

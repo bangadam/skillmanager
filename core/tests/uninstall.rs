@@ -1,4 +1,4 @@
-use skillmanager_core::{plan_uninstall, scan, scan_state, uninstall_with, Agent, ManagedKind, ManagedRoot, Root, UninstallAction, UninstallScope};
+use skillmanager_core::{plan_uninstall, scan, scan_state, uninstall_confirmed_with, uninstall_with, Agent, ManagedKind, ManagedRoot, Root, UninstallAction, UninstallScope};
 use std::{fs, io, os::unix::fs::symlink, path::Path};
 
 fn roots(base: &Path) -> Vec<Root> {
@@ -46,6 +46,18 @@ fn everywhere_plans_exact_paths_and_unlinks_before_trashing() {
     assert!(result.is_empty());
     assert_eq!(fs::read_to_string(trash_dir.join("alpha/SKILL.md")).unwrap(), "original");
     assert!(!master.exists());
+}
+
+#[test]
+fn stale_uninstall_plan_never_removes_a_copy() {
+    let temp = tempfile::tempdir().unwrap();
+    let roots = roots(temp.path());
+    fixture(&roots);
+    let expected = plan_uninstall(&roots, &scan(&roots).unwrap()[0], UninstallScope::Everywhere).unwrap().actions;
+    fs::remove_file(roots[2].path.join("alpha")).unwrap();
+    let error = uninstall_confirmed_with(&roots, &roots[0].path.join("alpha"), UninstallScope::Everywhere, &expected, |_| panic!("stale plan must not trash")).unwrap_err();
+    assert!(error.to_string().contains("review the plan again"));
+    assert!(roots[0].path.join("alpha/SKILL.md").exists());
 }
 
 #[test]

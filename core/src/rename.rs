@@ -1,4 +1,4 @@
-use crate::{scan, PresenceKind, Root, SkillState};
+use crate::{find_skill, scan, PresenceKind, Root, SkillState};
 use serde::{Deserialize, Serialize};
 use std::{fs, io, os::unix::fs::symlink, path::{Path, PathBuf}, time::{SystemTime, UNIX_EPOCH}};
 
@@ -50,8 +50,7 @@ pub fn rename(roots: &[Root], id: &str, new_name: &str, journal: &Path) -> io::R
     if !valid_name(new_name) || id == new_name {
         return Err(io::Error::new(io::ErrorKind::InvalidInput, "Enter a different valid directory name (no leading dot, slash, or surrounding whitespace)"));
     }
-    let skill = scan(roots)?.into_iter().find(|skill| skill.id == id)
-        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, format!("Skill {id:?} is not in a configured root")))?;
+    let skill = find_skill(roots, id)?;
     let mut real = skill.presences.iter().filter(|presence| presence.kind == PresenceKind::RealDir);
     let Some(master) = real.next() else {
         return Err(io::Error::other("Skill has no master copy in a configured root"));

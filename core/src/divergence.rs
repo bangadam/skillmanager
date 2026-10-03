@@ -1,4 +1,4 @@
-use crate::{scan, PresenceKind, Root, SkillState};
+use crate::{find_skill, markdown, scan, PresenceKind, Root, SkillState};
 use serde::Serialize;
 use std::{fs, io, os::unix::fs::symlink, path::{Path, PathBuf}};
 
@@ -14,13 +14,6 @@ pub struct SkillDiff {
     pub right: Option<String>,
 }
 
-fn markdown(path: &Path) -> io::Result<Option<String>> {
-    match fs::read_to_string(path.join("SKILL.md")) {
-        Ok(text) => Ok(Some(text)),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
-        Err(error) => Err(error),
-    }
-}
 
 pub(crate) fn divergent_pairs(skill: &SkillState) -> io::Result<Vec<DivergentPair>> {
     if skill.presences.len() < 2 { return Ok(Vec::new()); }
@@ -44,20 +37,16 @@ fn copy<'a>(skill: &'a SkillState, roots: &[Root], root: &Path) -> io::Result<&'
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, format!("{} has no copy of {}", root.display(), skill.id)))
 }
 
-fn skill(roots: &[Root], id: &str) -> io::Result<SkillState> {
-    scan(roots)?.into_iter().find(|skill| skill.id == id)
-        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, format!("No skill {id:?} in configured roots")))
-}
 
 pub fn skill_diff(roots: &[Root], id: &str, left_root: &Path, right_root: &Path) -> io::Result<SkillDiff> {
-    let skill = skill(roots, id)?;
+    let skill = find_skill(roots, id)?;
     let left = copy(&skill, roots, left_root)?;
     let right = copy(&skill, roots, right_root)?;
     Ok(SkillDiff { left: markdown(&left.path)?, right: markdown(&right.path)? })
 }
 
 fn replace(roots: &[Root], id: &str, target_root: &Path, master_root: &Path, trash: impl FnOnce(&Path) -> io::Result<()>) -> io::Result<Vec<SkillState>> {
-    let skill = skill(roots, id)?;
+    let skill = find_skill(roots, id)?;
     let target = copy(&skill, roots, target_root)?;
     let master = copy(&skill, roots, master_root)?;
     if target.path == master.path || target.kind != PresenceKind::RealDir || master.kind != PresenceKind::RealDir {

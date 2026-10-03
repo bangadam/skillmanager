@@ -44,11 +44,11 @@ export default function DuplicatesView({ skills, onGoToMissing }: { skills: unkn
 
   if (error) return <p role="alert" className="rounded-md border border-destructive p-5 text-destructive">Could not find duplicates: {error}</p>;
   if (!pairs) return <p role="status" className="py-12 text-muted-foreground">Comparing skill files…</p>;
-  if (pairs.length === 0) return <p className="rounded-md border border-dashed border-border py-16 text-center text-muted-foreground">No similar skills found. Nothing to reconcile.</p>;
 
   return (
     <section aria-label="Duplicate skills">
-      <p className="mb-5 text-sm text-muted-foreground">{pairs.length} {pairs.length === 1 ? "pair" : "pairs"} of text-similar skills. Select a pair to see every copy.</p>
+      <p className="mb-5 text-sm tabular-nums text-muted-foreground" aria-live="polite">{pairs.length} {pairs.length === 1 ? "duplicate pair" : "duplicate pairs"}{pairs.length > 0 && ". Select a pair to see every copy."}</p>
+      {pairs.length === 0 && <p className="rounded-md border border-dashed border-border py-16 text-center text-muted-foreground">No similar skills found. Nothing to reconcile.</p>}
       <div className="space-y-3">
         {pairs.map((pair) => (
           <details key={`${pair.a.id}:${pair.b.id}`} className="rounded-md border border-border">
@@ -60,9 +60,9 @@ export default function DuplicatesView({ skills, onGoToMissing }: { skills: unkn
               <Copies skill={pair.a} />
               <Copies skill={pair.b} />
               {onGoToMissing ? (
-                <p className="text-sm text-muted-foreground sm:col-span-2">To link copies, <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={onGoToMissing}>open the Missing view</button> and choose a skill. This comparison never changes files.</p>
+                <p className="text-sm text-muted-foreground sm:col-span-2">To manage copies, <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={onGoToMissing}>open the Missing view</button> for absent roots, or use Consolidate copies in All for unlinked duplicates. This comparison never changes files.</p>
               ) : (
-                <p className="text-sm text-muted-foreground sm:col-span-2">Linking is available from the Missing view once it is installed. This comparison never changes files.</p>
+                <p className="text-sm text-muted-foreground sm:col-span-2">Manage absent roots in Missing or unlinked duplicates in All. This comparison never changes files.</p>
               )}
             </div>
           </details>

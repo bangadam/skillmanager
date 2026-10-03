@@ -1,6 +1,6 @@
-use crate::SkillState;
+use crate::{markdown, SkillState};
 use serde::Serialize;
-use std::{fs, io};
+use std::io;
 
 // ponytail: a fixed 0.8 threshold is enough for a read-only radar; expose tuning if real skills need it.
 const NEAR_MATCH_THRESHOLD: f64 = 0.8;
@@ -52,9 +52,7 @@ impl Text {
 
 pub fn find_duplicates(skills: &[SkillState]) -> io::Result<Vec<DuplicatePair>> {
     let texts: Vec<Vec<Text>> = skills.iter().map(|skill| {
-        skill.presences.iter().map(|copy| {
-            fs::read_to_string(copy.path.join("SKILL.md")).map(|content| Text::new(&content))
-        }).collect()
+        skill.presences.iter().map(|copy| markdown(&copy.path).map(|content| Text::new(content.as_deref().unwrap_or_default()))).collect()
     }).collect::<io::Result<_>>()?;
     let mut pairs = Vec::new();
     for (i, a) in skills.iter().enumerate() {

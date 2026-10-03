@@ -20,6 +20,7 @@ export default function App() {
   const [diffSkill, setDiffSkill] = useState<SkillState | null>(null);
   const [uninstallSkill, setUninstallSkill] = useState<SkillState | null>(null);
   const [editSkill, setEditSkill] = useState<SkillState | null>(null);
+  const [consolidateSkill, setConsolidateSkill] = useState<SkillState | null>(null);
 
 
   return (
@@ -48,9 +49,10 @@ export default function App() {
               <SkillToolbar query={query} setQuery={setQuery} sort={sort} setSort={setSort} />
               <SkillFilter skills={skills} value={category} onChange={setCategory} />
             </div>
-            <AllView skills={filterSkills(skills, category)} allSkills={skills} query={query} sort={sort} onRefresh={setSkills} onDiff={setDiffSkill} onUninstall={setUninstallSkill} onEdit={setEditSkill} />
+            <AllView skills={filterSkills(skills, category)} allSkills={skills} query={query} sort={sort} onRefresh={setSkills} onDiff={setDiffSkill} onUninstall={setUninstallSkill} onEdit={setEditSkill} onConsolidate={setConsolidateSkill} />
           </>
         )}
+        {consolidateSkill && skills && <MissingView skills={skills} onRefresh={setSkills} onDiff={setDiffSkill} consolidate={consolidateSkill} onConsolidated={() => setConsolidateSkill(null)} dialogOnly />}
         <DivergenceDialog skill={diffSkill && skills?.find((skill) => skill.id === diffSkill.id && !skill.managed_source) || null} onClose={() => setDiffSkill(null)} onRefresh={setSkills} />
         <EditDialog skill={editSkill && skills?.find((skill) => skill.id === editSkill.id && !skill.managed_source) || null} resolving={!!diffSkill} onClose={() => setEditSkill(null)} onDiff={setDiffSkill} onRefresh={setSkills} />
         <UninstallDialog skill={uninstallSkill} onClose={() => setUninstallSkill(null)} onRefresh={setSkills} />

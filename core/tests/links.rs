@@ -89,6 +89,36 @@ fn later_divergence_refuses_before_trashing_earlier_identical_copy() {
 }
 
 #[test]
+fn fully_present_copies_consolidate_without_touching_divergent_folders() {
+    let temp = tempfile::tempdir().unwrap();
+    let roots = roots(temp.path());
+    for root in &roots { skill(root, "alpha", "same"); }
+    let trash = temp.path().join("Trash");
+    fs::write(roots[3].path.join("alpha/SKILL.md"), "different").unwrap();
+    assert!(choose_master_in(&roots, "alpha", &roots[0].path, &trash).unwrap_err().to_string().contains("divergent"));
+    assert!(!trash.exists());
+    for root in &roots { assert!(fs::symlink_metadata(root.path.join("alpha")).unwrap().is_dir()); }
+    fs::write(roots[3].path.join("alpha/SKILL.md"), "same").unwrap();
+    let state = choose_master_in(&roots, "alpha", &roots[0].path, &trash).unwrap();
+    assert_eq!(state[0].presences.iter().filter(|copy| copy.kind == PresenceKind::Link).count(), 3);
+    for root in &roots[1..] { assert_eq!(fs::read_link(root.path.join("alpha")).unwrap(), roots[0].path.join("alpha")); }
+}
+
+#[test]
+fn link_everywhere_keeps_earlier_links_when_later_root_is_occupied() {
+    let temp = tempfile::tempdir().unwrap();
+    let roots = roots(temp.path());
+    skill(&roots[0], "alpha", "body");
+    fs::create_dir_all(&roots[2].path).unwrap();
+    fs::write(roots[2].path.join("alpha"), "occupied").unwrap();
+    let result = link_everywhere(&roots, "alpha").unwrap();
+    assert_eq!(result.failures.len(), 1);
+    assert!(result.failures[0].contains("root-2"));
+    assert_eq!(result.skills[0].presences.len(), 3);
+    for root in [&roots[1], &roots[3]] { assert_eq!(fs::read_link(root.path.join("alpha")).unwrap(), roots[0].path.join("alpha")); }
+}
+
+#[test]
 fn missing_counts_all_configured_roots_and_link_everywhere_reports_partial_failure() {
     let temp = tempfile::tempdir().unwrap();
     let roots = roots(temp.path());

@@ -13,7 +13,7 @@ mod duplicates;
 pub use managed::{config_path, configured_roots, default_managed_roots, scan_state, ManagedKind, ManagedRoot, ManagedSource, ScanState};
 pub use duplicates::{find_duplicates, DuplicatePair};
 mod uninstall;
-pub use uninstall::{plan_uninstall, uninstall, uninstall_with, UninstallAction, UninstallPlan, UninstallScope};
+pub use uninstall::{plan_uninstall, plan_uninstall_source, uninstall, uninstall_with, uninstall_confirmed, uninstall_confirmed_with, UninstallAction, UninstallPlan, UninstallScope};
 
 use gray_matter::{engine::YAML, Matter};
 use serde::{Deserialize, Serialize};
@@ -23,6 +23,19 @@ use std::{
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
+
+fn markdown(path: &std::path::Path) -> io::Result<Option<String>> {
+    match fs::read_to_string(path.join("SKILL.md")) {
+        Ok(text) => Ok(Some(text)),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
+fn find_skill(roots: &[Root], id: &str) -> io::Result<SkillState> {
+    scan(roots)?.into_iter().find(|skill| skill.id == id)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, format!("Skill {id:?} is not in a configured root")))
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
