@@ -98,7 +98,7 @@ fn collect_skill_roots(base: &Path, dir: &Path, agent: Agent, depth: usize, root
         if name == "skills" {
             let parts: Vec<_> = dir.strip_prefix(base).unwrap_or(dir).components().collect();
             let plugin = if agent == Agent::Omp {
-                parts.iter().next().map(|p| p.as_os_str().to_string_lossy().split("___").take(2).collect::<Vec<_>>().join(" / "))
+                parts.first().map(|p| p.as_os_str().to_string_lossy().split("___").take(2).collect::<Vec<_>>().join(" / "))
             } else {
                 parts.get(1).map(|p| p.as_os_str().to_string_lossy().into_owned())
             };

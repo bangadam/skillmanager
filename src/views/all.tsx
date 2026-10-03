@@ -99,7 +99,7 @@ export function AllView({ skills, query, sort }: { skills: SkillState[]; query: 
                 <TableCell className="py-5 align-top">
                   <div className="flex flex-wrap gap-1.5">
                     {skill.presences.map((presence) => (
-                      <Badge key={presence.path} variant="secondary" title={`${agentLabels[presence.agent].long} · ${presence.kind === "link" ? "link" : "real copy"}`}>
+                      <Badge key={presence.path} variant="secondary" title={`${agentLabels[presence.agent].long} · ${skill.managed_source?.kind === "plugin" ? `plugin${skill.managed_source.plugin ? `: ${skill.managed_source.plugin}` : ""}` : skill.managed_source?.kind === "built_in" ? "built-in" : presence.kind === "link" ? "link" : "real copy"}`}>
                         <span className="sr-only">{agentLabels[presence.agent].long}: </span>{agentLabels[presence.agent].short}
                       </Badge>
                     ))}
