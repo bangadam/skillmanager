@@ -17,6 +17,7 @@ export type SkillState = {
   presences: Presence[];
   date_millis: number | null;
   date_source: "created" | "modified" | "unavailable";
+  managed_source?: { agent: Agent; kind: "plugin" | "built_in"; plugin: string | null } | null;
 };
 
 const agentLabels: Record<Agent, { short: string; long: string }> = {
@@ -92,13 +93,13 @@ export function AllView({ skills, query, sort }: { skills: SkillState[]; query: 
           </TableHeader>
           <TableBody>
             {visibleSkills.map((skill) => (
-              <TableRow key={skill.id}>
-                <TableCell className="py-5 align-top font-medium">{skill.name}</TableCell>
+              <TableRow key={`${skill.managed_source?.kind ?? "mine"}:${skill.managed_source?.agent ?? ""}:${skill.managed_source?.plugin ?? ""}:${skill.presences[0]?.path ?? skill.id}`} className={skill.managed_source ? "text-muted-foreground" : undefined}>
+                <TableCell className="py-5 align-top font-medium">{skill.name}{skill.managed_source && <span className="block text-xs font-normal">{skill.managed_source.kind === "plugin" ? `Plugin${skill.managed_source.plugin ? ` · ${skill.managed_source.plugin}` : ""}` : "Built-in"}</span>}</TableCell>
                 <TableCell className="py-5 align-top text-muted-foreground">{skill.description || "—"}</TableCell>
                 <TableCell className="py-5 align-top">
                   <div className="flex flex-wrap gap-1.5">
                     {skill.presences.map((presence) => (
-                      <Badge key={presence.path} variant="secondary" title={`${agentLabels[presence.agent].long} · ${presence.kind === "link" ? "link" : "real copy"}`}>
+                      <Badge key={presence.path} variant="secondary" title={`${agentLabels[presence.agent].long} · ${skill.managed_source?.kind === "plugin" ? `plugin${skill.managed_source.plugin ? `: ${skill.managed_source.plugin}` : ""}` : skill.managed_source?.kind === "built_in" ? "built-in" : presence.kind === "link" ? "link" : "real copy"}`}>
                         <span className="sr-only">{agentLabels[presence.agent].long}: </span>{agentLabels[presence.agent].short}
                       </Badge>
                     ))}

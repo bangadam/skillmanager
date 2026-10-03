@@ -2996,6 +2996,7 @@ dependencies = [
  "gray_matter",
  "notify-debouncer-mini",
  "serde",
+ "serde_json",
  "tempfile",
 ]
 
