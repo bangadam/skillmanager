@@ -13,6 +13,7 @@ export function RenameDialog({ skill, skills, onRefresh }: { skill: SkillState; 
   const [name, setName] = useState(skill.id);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const duplicate = skill.presences.filter((presence) => presence.kind === "real_dir").length > 1;
   const invalid = !name || name.trim() !== name || name.startsWith(".") || name.includes("/") || /[\u0000-\u001f\u007f-\u009f]/u.test(name) || name === skill.id;
   const collision = skills.some((other) => !other.managed_source && other.id === name && other.id !== skill.id);
   const validation = duplicate ? "This skill has unlinked duplicate copies. Link them first, then rename." : invalid ? "Enter a different folder name without a leading dot, slash, or surrounding whitespace." : collision ? `A skill named “${name}” already exists.` : null;
