@@ -4,13 +4,17 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] App launches to a single window with zero manual configuration.
-- [ ] Every skill in the four canonical roots appears once, grouped by folder name (identity), showing name and description from SKILL.md frontmatter.
-- [ ] Agent icons reflect which roots currently hold the skill (real copy or link).
-- [ ] The listed skill count matches disk reality.
-- [ ] Frontmatter quirks (missing name, missing description) degrade gracefully; the scan never fails on a malformed SKILL.md.
-- [ ] Rust core scan is covered by integration tests over temp-dir fixtures: frontmatter variety, empty roots, nested subfolders.
-- [ ] Window appearance follows the macOS system theme.
-- [ ] shadcn/ui is initialized and the list is built from its primitives.
+- [x] App launches to a single window with zero manual configuration.
+- [x] Every skill in the four canonical roots appears once, grouped by folder name (identity), showing name and description from SKILL.md frontmatter.
+- [x] Agent icons reflect which roots currently hold the skill (real copy or link).
+- [x] The listed skill count matches disk reality.
+- [x] Frontmatter quirks (missing name, missing description) degrade gracefully; the scan never fails on a malformed SKILL.md.
+- [x] Rust core scan is covered by integration tests over temp-dir fixtures: frontmatter variety, empty roots, nested subfolders.
+- [x] Window appearance follows the macOS system theme.
+- [x] shadcn/ui is initialized and the list is built from its primitives.
+
+## Comments
+
+- Resolved on integration/skill-manager-v1 (implement-spec run, 2026-10-04). Landed in commit 3603838. Verified: cargo test --workspace 51 passed, cargo clippy --workspace --all-targets -- -D warnings clean, npx tsc --noEmit clean. Visual/dev-server check deferred per repo owner's command policy.

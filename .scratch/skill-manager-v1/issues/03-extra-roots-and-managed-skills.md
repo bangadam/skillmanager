@@ -4,11 +4,15 @@
 
 **Blocked by:** 01 — tracer bullet: app shell and the skill list.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Adding a path to the config file makes its skills appear in the list on next launch (and next rescan).
-- [ ] Plugin and built-in skills appear with their source agent marked.
-- [ ] The toolbar filter: mine / plugin / built-in / all — each works and shows its count.
-- [ ] Plugin and built-in skills expose no link, edit, rename, or uninstall actions.
-- [ ] Plugin and built-in skills are never counted as Missing (they're managed by their agent, not by roots).
-- [ ] A malformed or missing config file is reported in the UI, never silently ignored.
+- [x] Adding a path to the config file makes its skills appear in the list on next launch (and next rescan).
+- [x] Plugin and built-in skills appear with their source agent marked.
+- [x] The toolbar filter: mine / plugin / built-in / all — each works and shows its count.
+- [x] Plugin and built-in skills expose no link, edit, rename, or uninstall actions.
+- [x] Plugin and built-in skills are never counted as Missing (they're managed by their agent, not by roots).
+- [x] A malformed or missing config file is reported in the UI, never silently ignored.
+
+## Comments
+
+- Resolved on integration/skill-manager-v1 (implement-spec run, 2026-10-04). Landed in commit d2873fa. Verified: cargo test --workspace 51 passed, cargo clippy --workspace --all-targets -- -D warnings clean, npx tsc --noEmit clean. Visual/dev-server check deferred per repo owner's command policy.

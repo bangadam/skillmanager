@@ -4,14 +4,18 @@
 
 **Blocked by:** 01 — tracer bullet: app shell and the skill list.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Missing view lists skills absent from at least one configured root, and only those.
-- [ ] "Add to" creates a symlink in the chosen root pointing at the skill's master copy.
-- [ ] "Link everywhere" creates links in every absent root in one action.
-- [ ] After linking, the skill's icon row gains the target agent; the target root holds a symlink.
-- [ ] An edit to the master copy is visible through every link (integration test).
-- [ ] Linking a skill with unlinked duplicates prompts for the master copy, defaulting to canonical-root order.
-- [ ] After master selection, non-master copies become links to the master.
-- [ ] Linking onto a target that already holds any copy is refused with an actionable error.
-- [ ] No filesystem change ever happens without an explicit click.
+- [x] Missing view lists skills absent from at least one configured root, and only those.
+- [x] "Add to" creates a symlink in the chosen root pointing at the skill's master copy.
+- [x] "Link everywhere" creates links in every absent root in one action.
+- [x] After linking, the skill's icon row gains the target agent; the target root holds a symlink.
+- [x] An edit to the master copy is visible through every link (integration test).
+- [x] Linking a skill with unlinked duplicates prompts for the master copy, defaulting to canonical-root order.
+- [x] After master selection, non-master copies become links to the master.
+- [x] Linking onto a target that already holds any copy is refused with an actionable error.
+- [x] No filesystem change ever happens without an explicit click.
+
+## Comments
+
+- Resolved on integration/skill-manager-v1 (implement-spec run, 2026-10-04). Landed in commit e783961. Verified: cargo test --workspace 51 passed, cargo clippy --workspace --all-targets -- -D warnings clean, npx tsc --noEmit clean. Visual/dev-server check deferred per repo owner's command policy.

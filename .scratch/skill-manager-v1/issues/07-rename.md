@@ -4,12 +4,16 @@
 
 **Blocked by:** 04 — links: Missing view, Add to, link everywhere.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Renaming renames the master folder on disk.
-- [ ] Every link points at the renamed path afterwards (no dangling links; integration test).
-- [ ] SKILL.md frontmatter `name` matches the new name.
-- [ ] The rename journal records old name, new name, and timestamp.
-- [ ] The old name leaves no residue: the skill groups under its new name, agent icons unchanged.
-- [ ] Renaming a name that collides with an existing skill is refused.
-- [ ] Unlinked duplicate copies are not renamed.
+- [x] Renaming renames the master folder on disk.
+- [x] Every link points at the renamed path afterwards (no dangling links; integration test).
+- [x] SKILL.md frontmatter `name` matches the new name.
+- [x] The rename journal records old name, new name, and timestamp.
+- [x] The old name leaves no residue: the skill groups under its new name, agent icons unchanged.
+- [x] Renaming a name that collides with an existing skill is refused.
+- [x] Unlinked duplicate copies are not renamed.
+
+## Comments
+
+- Resolved on integration/skill-manager-v1 (implement-spec run, 2026-10-04). Landed in commit f9a9c0c. Verified: cargo test --workspace 51 passed, cargo clippy --workspace --all-targets -- -D warnings clean, npx tsc --noEmit clean. Visual/dev-server check deferred per repo owner's command policy.
