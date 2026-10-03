@@ -7,12 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 type Agent = "claude_code" | "codex" | "cursor" | "omp";
 export type Root = { agent: Agent; path: string };
-export type MissingSkill = { id: string; name: string; description: string; presences: { path: string; agent: Agent; kind: "real_dir" | "link" }[]; date_millis: number | null; date_source: "created" | "modified" | "unavailable" };
+export type MissingSkill = { id: string; name: string; description: string; divergent_pairs: { left: string; right: string }[]; presences: { path: string; agent: Agent; kind: "real_dir" | "link" }[]; date_millis: number | null; date_source: "created" | "modified" | "unavailable" };
 type Choice = { skill: MissingSkill; everywhere: boolean };
 const agentName: Record<string, string> = { claude_code: "Claude Code", codex: "Codex", cursor: "Cursor", omp: "omp" };
 const label = (root: Root) => `${agentName[root.agent] ?? root.agent} · ${root.path}`;
 
-export function MissingView({ skills, onRefresh }: { skills: MissingSkill[]; onRefresh: (skills: MissingSkill[]) => void }) {
+export function MissingView({ skills, onRefresh, onDiff }: { skills: MissingSkill[]; onRefresh: (skills: MissingSkill[]) => void; onDiff: (skill: MissingSkill) => void }) {
   const [roots, setRoots] = useState<Root[]>([]);
   const [missing, setMissing] = useState<MissingSkill[]>([]);
   const [choice, setChoice] = useState<Choice | null>(null);
@@ -54,6 +54,7 @@ export function MissingView({ skills, onRefresh }: { skills: MissingSkill[]; onR
       // A master selection may already have linkified duplicates; refresh even when the next step fails.
       try { onRefresh((await invoke<{ skills: MissingSkill[] }>("scan_skills")).skills); } catch { /* Show the operation error first. */ }
       setError(String(reason));
+      if (choice.skill.divergent_pairs?.length && String(reason).includes("divergent")) { setChoice(null); onDiff(choice.skill); }
     } finally { setBusy(false); }
   };
 
@@ -61,7 +62,7 @@ export function MissingView({ skills, onRefresh }: { skills: MissingSkill[]; onR
     {error && <p role="alert" className="mb-4 rounded-md border border-destructive p-3 text-destructive">{error}</p>}
     {missing.length === 0 ? <p className="rounded-md border border-dashed p-12 text-center text-muted-foreground">No missing skills — every configured root has each skill.</p> :
       <ul className="divide-y divide-border">{missing.map((skill) => <li key={skill.id} className="flex flex-wrap items-center justify-between gap-4 py-5">
-        <div><p className="font-medium">{skill.name}</p><p className="text-sm text-muted-foreground">{skill.description || skill.id}</p></div>
+        <div><p className="font-medium">{skill.name}{skill.divergent_pairs?.length > 0 && <Button className="ml-2" variant="outline" size="sm" onClick={() => onDiff(skill)}>⚠ Divergent · Review diff</Button>}</p><p className="text-sm text-muted-foreground">{skill.description || skill.id}</p></div>
         <div className="flex gap-2"><Button variant="outline" onClick={() => open(skill, false)}>Add to…</Button><Button onClick={() => open(skill, true)}>Link everywhere</Button></div>
       </li>)}</ul>}
     <Dialog open={choice !== null} onOpenChange={(isOpen) => { if (!isOpen && !busy) { setChoice(null); setError(null); } }}>
@@ -71,6 +72,7 @@ export function MissingView({ skills, onRefresh }: { skills: MissingSkill[]; onR
         {real.length > 1 && <div className="space-y-3"><p className="text-sm font-medium">Choose the master copy</p><p className="text-sm text-muted-foreground">Identical other real copies move to Trash, then become links. Divergent copies are never changed.</p>
           <RadioGroup value={master} onValueChange={setMaster}>{real.map((root) => <label key={root.path} className="flex items-center gap-2 text-sm"><RadioGroupItem value={root.path} />{label(root)}</label>)}</RadioGroup></div>}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        {choice && choice.skill.divergent_pairs?.length > 0 && <Button variant="outline" onClick={() => { setChoice(null); onDiff(choice.skill); }}>Review divergent copies and diff</Button>}
         <DialogFooter><Button variant="outline" disabled={busy} onClick={() => setChoice(null)}>Cancel</Button><Button disabled={busy || (!choice?.everywhere && !target)} onClick={act}>{busy ? "Linking…" : "Confirm links"}</Button></DialogFooter>
       </DialogContent>
     </Dialog>

@@ -104,13 +104,14 @@ fn missing_counts_all_configured_roots_and_link_everywhere_reports_partial_failu
     assert!(error.contains("master"), "{error}");
     let trash = temp.path().join("Trash");
     choose_master_in(&roots, "alpha", &roots[0].path, &trash).unwrap();
-    fs::create_dir_all(roots[3].path.join("alpha")).unwrap(); // Occupied after scan, but not a loadable skill.
+    fs::create_dir_all(&roots[3].path).unwrap();
+    fs::write(roots[3].path.join("alpha"), "occupied").unwrap(); // A non-skill occupant must block linking.
     let result = link_everywhere(&roots, "alpha").unwrap();
     assert_eq!(result.failures.len(), 1);
     assert!(result.failures[0].contains("root-3"));
     assert_eq!(fs::read_link(roots[1].path.join("alpha")).unwrap(), roots[0].path.join("alpha"));
     assert_eq!(result.skills[0].presences.len(), 3);
-    assert!(fs::symlink_metadata(roots[3].path.join("alpha")).unwrap().is_dir());
+    assert!(fs::symlink_metadata(roots[3].path.join("alpha")).unwrap().is_file());
 }
 
 #[test]

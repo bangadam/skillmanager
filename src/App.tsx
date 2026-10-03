@@ -6,6 +6,8 @@ import { filterSkills, SkillFilter, type SkillCategory } from "@/components/skil
 import { AllView, SkillToolbar } from "@/views/all";
 import type { SkillSort } from "@/views/sort-skills";
 import DuplicatesView from "@/views/duplicates";
+import { DivergenceDialog } from "@/components/divergence-dialog";
+import type { SkillState } from "@/views/all";
 
 export default function App() {
   const { skills, setSkills, error, configError, configNotice } = useSkills();
@@ -13,6 +15,7 @@ export default function App() {
   const [view, setView] = useState<"all" | "missing" | "duplicates">("all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SkillSort>("created-desc");
+  const [diffSkill, setDiffSkill] = useState<SkillState | null>(null);
 
 
   return (
@@ -34,16 +37,17 @@ export default function App() {
         ) : skills === null ? (
           <p role="status" className="py-12 text-muted-foreground">Scanning skill folders…</p>
         ) : view === "missing" ? (
-          <MissingView skills={skills} onRefresh={setSkills} />
+          <MissingView skills={skills} onRefresh={setSkills} onDiff={setDiffSkill} />
         ) : (
           <>
             <div className="mb-5 flex flex-wrap items-center gap-3">
               <SkillToolbar query={query} setQuery={setQuery} sort={sort} setSort={setSort} />
               <SkillFilter skills={skills} value={category} onChange={setCategory} />
             </div>
-            <AllView skills={filterSkills(skills, category)} query={query} sort={sort} />
+            <AllView skills={filterSkills(skills, category)} query={query} sort={sort} onDiff={setDiffSkill} />
           </>
         )}
+        <DivergenceDialog skill={diffSkill && skills?.find((skill) => skill.id === diffSkill.id && !skill.managed_source) || null} onClose={() => setDiffSkill(null)} onRefresh={setSkills} />
       </div>
     </main>
   );

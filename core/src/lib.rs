@@ -1,3 +1,5 @@
+mod divergence;
+pub use divergence::{replace_with_link, replace_with_link_in, skill_diff, DivergentPair, SkillDiff};
 mod links;
 pub use links::{choose_master, choose_master_in, link, link_everywhere, missing, LinkEverywhereResult};
 mod watch;
@@ -62,6 +64,7 @@ pub struct SkillState {
     pub date_millis: Option<u64>,
     pub date_source: DateSource,
     pub managed_source: Option<ManagedSource>,
+    pub divergent_pairs: Vec<DivergentPair>,
 }
 
 #[derive(Deserialize)]
@@ -87,6 +90,7 @@ pub fn default_roots() -> io::Result<Vec<Root>> {
 pub fn scan(roots: &[Root]) -> io::Result<Vec<SkillState>> {
     let parser = Matter::<YAML>::new();
     let mut skills = BTreeMap::<String, SkillState>::new();
+    let mut missing_markdown = Vec::new();
     for root in roots {
         let entries = match fs::read_dir(&root.path) {
             Ok(entries) => entries,
@@ -107,11 +111,15 @@ pub fn scan(roots: &[Root]) -> io::Result<Vec<SkillState>> {
                 Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
                 Err(error) => return Err(error),
             };
+            let id = entry.file_name().to_string_lossy().into_owned();
             let markdown = path.join("SKILL.md");
             if !matches!(fs::symlink_metadata(&markdown), Ok(metadata) if metadata.is_file()) {
+                missing_markdown.push((id, Presence {
+                    agent: root.agent, path,
+                    kind: if link_metadata.file_type().is_symlink() { PresenceKind::Link } else { PresenceKind::RealDir },
+                }));
                 continue;
             }
-            let id = entry.file_name().to_string_lossy().into_owned();
             let (name, description) = fs::read_to_string(markdown)
                 .ok()
                 .and_then(|text| parser.parse::<FrontMatter>(&text).ok()?.data)
@@ -134,6 +142,7 @@ pub fn scan(roots: &[Root]) -> io::Result<Vec<SkillState>> {
                 date_millis,
                 date_source,
                 managed_source: None,
+                divergent_pairs: Vec::new(),
             });
             skill.presences.push(Presence {
                 agent: root.agent,
@@ -145,6 +154,12 @@ pub fn scan(roots: &[Root]) -> io::Result<Vec<SkillState>> {
                 },
             });
         }
+    }
+    for (id, presence) in missing_markdown {
+        if let Some(skill) = skills.get_mut(&id) { skill.presences.push(presence); }
+    }
+    for skill in skills.values_mut() {
+        skill.divergent_pairs = divergence::divergent_pairs(skill)?;
     }
     Ok(skills.into_values().collect())
 }

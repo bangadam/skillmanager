@@ -11,6 +11,7 @@ import { filterAndSortSkills, type SkillSort } from "./sort-skills";
 export type Agent = "claude_code" | "codex" | "cursor" | "omp";
 export type Presence = { agent: Agent; path: string; kind: "real_dir" | "link" };
 export type SkillState = {
+  divergent_pairs: { left: string; right: string }[];
   id: string;
   name: string;
   description: string;
@@ -66,7 +67,7 @@ export function SkillToolbar({ query, setQuery, sort, setSort }: {
   );
 }
 
-export function AllView({ skills, query, sort }: { skills: SkillState[]; query: string; sort: SkillSort }) {
+export function AllView({ skills, query, sort, onDiff }: { skills: SkillState[]; query: string; sort: SkillSort; onDiff?: (skill: SkillState) => void }) {
   const visibleSkills = filterAndSortSkills(skills, query, sort);
   return (
     <section aria-label="Skills">
@@ -94,7 +95,7 @@ export function AllView({ skills, query, sort }: { skills: SkillState[]; query: 
           <TableBody>
             {visibleSkills.map((skill) => (
               <TableRow key={`${skill.managed_source?.kind ?? "mine"}:${skill.managed_source?.agent ?? ""}:${skill.managed_source?.plugin ?? ""}:${skill.presences[0]?.path ?? skill.id}`} className={skill.managed_source ? "text-muted-foreground" : undefined}>
-                <TableCell className="py-5 align-top font-medium">{skill.name}{skill.managed_source && <span className="block text-xs font-normal">{skill.managed_source.kind === "plugin" ? `Plugin${skill.managed_source.plugin ? ` · ${skill.managed_source.plugin}` : ""}` : "Built-in"}</span>}</TableCell>
+                <TableCell className="py-5 align-top font-medium">{skill.name}{skill.divergent_pairs?.length > 0 && <button type="button" className="ml-2 rounded border border-amber-600/50 px-2 py-0.5 text-xs text-amber-700 hover:bg-amber-100 focus-visible:outline-2 dark:text-amber-400 dark:hover:bg-amber-950" onClick={() => onDiff?.(skill)}>⚠ Divergent · Review diff</button>}{skill.managed_source && <span className="block text-xs font-normal">{skill.managed_source.kind === "plugin" ? `Plugin${skill.managed_source.plugin ? ` · ${skill.managed_source.plugin}` : ""}` : "Built-in"}</span>}</TableCell>
                 <TableCell className="py-5 align-top text-muted-foreground">{skill.description || "—"}</TableCell>
                 <TableCell className="py-5 align-top">
                   <div className="flex flex-wrap gap-1.5">
