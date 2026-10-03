@@ -7,6 +7,7 @@ import { AllView, SkillToolbar } from "@/views/all";
 import type { SkillSort } from "@/views/sort-skills";
 import DuplicatesView from "@/views/duplicates";
 import { DivergenceDialog } from "@/components/divergence-dialog";
+import { UninstallDialog } from "@/components/uninstall-dialog";
 import type { SkillState } from "@/views/all";
 
 export default function App() {
@@ -16,6 +17,7 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SkillSort>("created-desc");
   const [diffSkill, setDiffSkill] = useState<SkillState | null>(null);
+  const [uninstallSkill, setUninstallSkill] = useState<SkillState | null>(null);
 
 
   return (
@@ -44,10 +46,11 @@ export default function App() {
               <SkillToolbar query={query} setQuery={setQuery} sort={sort} setSort={setSort} />
               <SkillFilter skills={skills} value={category} onChange={setCategory} />
             </div>
-            <AllView skills={filterSkills(skills, category)} allSkills={skills} query={query} sort={sort} onRefresh={setSkills} onDiff={setDiffSkill} />
+            <AllView skills={filterSkills(skills, category)} allSkills={skills} query={query} sort={sort} onRefresh={setSkills} onDiff={setDiffSkill} onUninstall={setUninstallSkill} />
           </>
         )}
         <DivergenceDialog skill={diffSkill && skills?.find((skill) => skill.id === diffSkill.id && !skill.managed_source) || null} onClose={() => setDiffSkill(null)} onRefresh={setSkills} />
+        <UninstallDialog skill={uninstallSkill} onClose={() => setUninstallSkill(null)} onRefresh={setSkills} />
       </div>
     </main>
   );
