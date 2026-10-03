@@ -1,3 +1,6 @@
+mod managed;
+pub use managed::{config_path, configured_roots, default_managed_roots, scan_state, ManagedKind, ManagedRoot, ManagedSource, ScanState};
+
 use gray_matter::{engine::YAML, Matter};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -7,7 +10,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Agent {
     ClaudeCode,
@@ -16,7 +19,7 @@ pub enum Agent {
     Omp,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Root {
     pub agent: Agent,
     pub path: PathBuf,
@@ -52,6 +55,7 @@ pub struct SkillState {
     pub presences: Vec<Presence>,
     pub date_millis: Option<u64>,
     pub date_source: DateSource,
+    pub managed_source: Option<ManagedSource>,
 }
 
 #[derive(Deserialize)]
@@ -123,6 +127,7 @@ pub fn scan(roots: &[Root]) -> io::Result<Vec<SkillState>> {
                 presences: Vec::new(),
                 date_millis,
                 date_source,
+                managed_source: None,
             });
             skill.presences.push(Presence {
                 agent: root.agent,
