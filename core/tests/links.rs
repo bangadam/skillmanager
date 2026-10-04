@@ -178,3 +178,44 @@ fn linking_everywhere_uses_extra_root_from_config() {
     assert_eq!(fs::read_link(extra.join("alpha")).unwrap(), roots[0].path.join("alpha"));
 }
 
+
+#[test]
+fn nested_group_copies_cover_their_root() {
+    let temp = tempfile::tempdir().unwrap();
+    let claude = Root { agent: Agent::ClaudeCode, path: temp.path().join("claude") };
+    let hermes = Root { agent: Agent::Hermes, path: temp.path().join("hermes") };
+    let roots = vec![claude.clone(), hermes.clone()];
+    fs::create_dir_all(claude.path.join("alpha")).unwrap();
+    fs::write(claude.path.join("alpha/SKILL.md"), "one").unwrap();
+    let nested = hermes.path.join("group/alpha");
+    fs::create_dir_all(&nested).unwrap();
+    fs::write(nested.join("SKILL.md"), "one").unwrap();
+
+    let skills = scan(&roots).unwrap();
+    assert!(missing(&skills, &roots).is_empty());
+    let result = link_everywhere(&roots, "alpha").unwrap();
+    assert!(result.failures.is_empty());
+    assert_eq!(result.skills.iter().find(|s| s.id == "alpha").unwrap().presences.len(), 2);
+    assert!(!hermes.path.join("alpha").exists());
+
+    let error = link(&roots, "alpha", &hermes.path).unwrap_err().to_string();
+    assert!(error.contains("already holds") && error.contains("group"), "{error}");
+}
+
+#[test]
+fn choosing_a_nested_master_relinks_other_copies_to_the_nested_folder() {
+    let temp = tempfile::tempdir().unwrap();
+    let claude = Root { agent: Agent::ClaudeCode, path: temp.path().join("claude") };
+    let hermes = Root { agent: Agent::Hermes, path: temp.path().join("hermes") };
+    let roots = vec![claude.clone(), hermes.clone()];
+    let nested = hermes.path.join("group/alpha");
+    for path in [claude.path.join("alpha"), nested.clone()] {
+        fs::create_dir_all(&path).unwrap();
+        fs::write(path.join("SKILL.md"), "one").unwrap();
+    }
+    let skills = choose_master_in(&roots, "alpha", &hermes.path, &temp.path().join("trash")).unwrap();
+    let alpha = skills.iter().find(|s| s.id == "alpha").unwrap();
+    assert_eq!(alpha.presences.len(), 2);
+    assert_eq!(alpha.presences[0].kind, PresenceKind::Link);
+    assert_eq!(fs::read_link(claude.path.join("alpha")).unwrap(), nested);
+}

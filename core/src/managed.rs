@@ -1,12 +1,12 @@
 use crate::{Agent, Root, SkillState};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{fs, io, path::{Path, PathBuf}};
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ManagedKind { Plugin, BuiltIn }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct ManagedSource {
     pub agent: Agent,
     pub kind: ManagedKind,
@@ -21,7 +21,7 @@ pub struct ManagedRoot {
     pub plugin: Option<String>,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct ScanState {
     pub skills: Vec<SkillState>,
     pub config_error: Option<String>,
@@ -102,14 +102,8 @@ fn collect_skill_roots(base: &Path, dir: &Path, agent: Agent, depth: usize, root
             } else {
                 parts.get(1).map(|p| p.as_os_str().to_string_lossy().into_owned())
             };
-            roots.push(ManagedRoot { agent, path: path.clone(), kind: ManagedKind::Plugin, plugin: plugin.clone() });
-            // omp skills are grouped under skills/<group>/<skill>; other caches can use groups too.
-            for group in fs::read_dir(path)? {
-                let group = group?;
-                if group.file_type()?.is_dir() && !group.path().join("SKILL.md").exists() {
-                    roots.push(ManagedRoot { agent, path: group.path(), kind: ManagedKind::Plugin, plugin: plugin.clone() });
-                }
-            }
+            roots.push(ManagedRoot { agent, path: path.clone(), kind: ManagedKind::Plugin, plugin });
+            // omp and other caches group skills under skills/<group>/<skill>; scan descends into those groups.
         } else {
             collect_skill_roots(base, &path, agent, depth + 1, roots)?;
         }

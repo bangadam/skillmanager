@@ -3,11 +3,11 @@ import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { SkillState } from "@/views/all";
+import { agentMeta } from "@/components/agent-meta";
 
 type Action = { action: "remove_link" | "promote" | "repoint_link" | "trash_master"; path: string; target?: string };
 type ScanState = { skills: SkillState[] };
 const labels = { remove_link: "Remove link", promote: "Promote to master", repoint_link: "Re-point link", trash_master: "Move to Trash" };
-const agentLabels = { claude_code: "Claude Code", codex: "Codex", cursor: "Cursor", omp: "omp" };
 
 export function UninstallDialog({ skill, onClose, onRefresh }: {
   skill: SkillState | null;
@@ -57,7 +57,7 @@ export function UninstallDialog({ skill, onClose, onRefresh }: {
         </DialogHeader>
         {skill?.managed_source && (
           <p role="note" className="rounded-md border border-amber-600/50 bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-            Managed skill — this removes it from {agentLabels[skill.managed_source.agent]}'s plugin cache. The agent may re-install it next time it updates or re-syncs its plugins.
+            Managed skill — this removes it from {agentMeta[skill.managed_source.agent].label}'s plugin cache. The agent may re-install it next time it updates or re-syncs its plugins.
           </p>
         )}
         <label className="grid gap-1 text-sm font-medium">
@@ -66,7 +66,7 @@ export function UninstallDialog({ skill, onClose, onRefresh }: {
             <option value="">Everywhere</option>
             {skill?.presences.map((presence) => (
               <option value={presence.path.slice(0, -(skill.id.length + 1))} key={presence.path}>
-                {agentLabels[presence.agent]} · {presence.path.slice(0, -(skill.id.length + 1))}
+                {agentMeta[presence.agent].label} · {presence.path.slice(0, -(skill.id.length + 1))}
               </option>
             ))}
           </select>

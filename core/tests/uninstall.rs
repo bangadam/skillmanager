@@ -1,4 +1,4 @@
-use skillmanager_core::{plan_uninstall, scan, scan_state, uninstall_confirmed_with, uninstall_with, Agent, ManagedKind, ManagedRoot, Root, UninstallAction, UninstallScope};
+use skillmanager_core::{plan_bulk_uninstall, plan_uninstall, scan, scan_state, uninstall_bulk_confirmed_with, uninstall_confirmed_with, uninstall_with, Agent, ManagedKind, ManagedRoot, Root, UninstallAction, UninstallScope};
 use std::{fs, io, os::unix::fs::symlink, path::Path};
 
 fn roots(base: &Path) -> Vec<Root> {
@@ -156,4 +156,141 @@ fn uninstalling_a_managed_row_trashes_only_the_cached_copy() {
     assert_eq!(fs::read_to_string(trash_dir.join("alpha/SKILL.md")).unwrap(), "managed");
     assert!(roots[0].path.join("alpha/SKILL.md").exists());
     assert_eq!(result[0].presences.len(), 3);
+}
+
+#[test]
+fn everywhere_trashes_every_unlinked_real_copy() {
+    let temp = tempfile::tempdir().unwrap();
+    let roots = roots(temp.path());
+    // alpha as two unlinked real copies plus one link to the first copy.
+    fs::create_dir_all(roots[0].path.join("alpha")).unwrap();
+    fs::write(roots[0].path.join("alpha/SKILL.md"), "original").unwrap();
+    fs::create_dir_all(roots[1].path.join("alpha")).unwrap();
+    fs::write(roots[1].path.join("alpha/SKILL.md"), "divergent").unwrap();
+    fs::create_dir_all(&roots[2].path).unwrap();
+    symlink(&roots[0].path.join("alpha"), roots[2].path.join("alpha")).unwrap();
+    let skills = scan(&roots).unwrap();
+    let original = skills[0].clone();
+    let link = roots[2].path.join("alpha");
+    let plan = plan_uninstall(&skills, &roots, &original, UninstallScope::Everywhere).unwrap();
+    assert!(plan.actions.contains(&UninstallAction::TrashMaster { path: roots[0].path.join("alpha") }));
+    assert!(plan.actions.contains(&UninstallAction::TrashMaster { path: roots[1].path.join("alpha") }));
+    assert!(plan.actions.contains(&UninstallAction::RemoveLink { path: link.clone() }));
+    let trash_dir = temp.path().join("Trash");
+    // Distinct destination per path: the real macOS Trash dedupes names; this fixture cannot.
+    let mut trashed = 0usize;
+    let result = uninstall_with(&skills, &roots, &original, UninstallScope::Everywhere, |path| {
+        trashed += 1;
+        fs::create_dir_all(&trash_dir).unwrap();
+        fs::rename(path, trash_dir.join(format!("copy-{trashed}")))
+    }).unwrap();
+    assert!(result.is_empty());
+    assert!(fs::symlink_metadata(&link).is_err());
+    assert_eq!(fs::read_to_string(trash_dir.join("copy-1/SKILL.md")).unwrap(), "original");
+    assert_eq!(fs::read_to_string(trash_dir.join("copy-2/SKILL.md")).unwrap(), "divergent");
+}
+
+#[test]
+fn root_scope_still_requires_one_master_for_unlinked_duplicates() {
+    let temp = tempfile::tempdir().unwrap();
+    let roots = roots(temp.path());
+    fs::create_dir_all(roots[0].path.join("alpha")).unwrap();
+    fs::write(roots[0].path.join("alpha/SKILL.md"), "original").unwrap();
+    fs::create_dir_all(roots[1].path.join("alpha")).unwrap();
+    fs::write(roots[1].path.join("alpha/SKILL.md"), "divergent").unwrap();
+    let skills = scan(&roots).unwrap();
+    let error = plan_uninstall(&skills, &roots, &skills[0], UninstallScope::Root(roots[0].path.clone())).unwrap_err();
+    assert!(error.to_string().contains("one master copy"), "{error}");
+}
+
+#[test]
+fn bulk_uninstall_trashes_every_requested_skill_once() {
+    let temp = tempfile::tempdir().unwrap();
+    let roots = roots(temp.path());
+    fixture(&roots);
+    let beta = roots[0].path.join("beta");
+    fs::create_dir_all(&beta).unwrap();
+    fs::write(beta.join("SKILL.md"), "beta").unwrap();
+    symlink(&beta, roots[1].path.join("beta")).unwrap();
+    let skills = scan(&roots).unwrap();
+    let sources = vec![roots[0].path.join("alpha"), beta.clone()];
+    let entries = plan_bulk_uninstall(&skills, &roots, &sources).unwrap();
+    assert_eq!(entries.iter().map(|entry| entry.name.clone()).collect::<Vec<_>>(), ["alpha", "beta"]);
+    let expected: Vec<_> = entries.iter().map(|entry| entry.plan.clone()).collect();
+    let trash_dir = temp.path().join("Trash");
+    uninstall_bulk_confirmed_with(&skills, &roots, &sources, &expected, |path| trash(path, &trash_dir)).unwrap();
+    assert!(!roots[0].path.join("alpha").exists() && !beta.exists());
+    assert!(fs::symlink_metadata(roots[1].path.join("alpha")).is_err());
+    assert!(fs::symlink_metadata(roots[1].path.join("beta")).is_err());
+    assert_eq!(fs::read_to_string(trash_dir.join("alpha/SKILL.md")).unwrap(), "original");
+    assert_eq!(fs::read_to_string(trash_dir.join("beta/SKILL.md")).unwrap(), "beta");
+}
+
+#[test]
+fn stale_bulk_plan_removes_nothing() {
+    let temp = tempfile::tempdir().unwrap();
+    let roots = roots(temp.path());
+    fixture(&roots);
+    let skills = scan(&roots).unwrap();
+    let sources = vec![roots[0].path.join("alpha")];
+    let entries = plan_bulk_uninstall(&skills, &roots, &sources).unwrap();
+    let expected: Vec<_> = entries.iter().map(|entry| entry.plan.clone()).collect();
+    fs::remove_file(roots[2].path.join("alpha")).unwrap();
+    let fresh = scan(&roots).unwrap();
+    let error = uninstall_bulk_confirmed_with(&fresh, &roots, &sources, &expected, |_| panic!("stale plan must not trash")).unwrap_err();
+    assert!(error.to_string().contains("review the plan again"), "{error}");
+    assert!(roots[0].path.join("alpha/SKILL.md").exists());
+}
+
+#[test]
+fn bulk_uninstall_refuses_mismatched_plan_length() {
+    let temp = tempfile::tempdir().unwrap();
+    let roots = roots(temp.path());
+    fixture(&roots);
+    let skills = scan(&roots).unwrap();
+    let error = uninstall_bulk_confirmed_with(&skills, &roots, &[roots[0].path.join("alpha")], &[], |_| panic!("must refuse")).unwrap_err();
+    assert!(error.to_string().contains("does not match"), "{error}");
+    assert!(roots[0].path.join("alpha/SKILL.md").exists());
+}
+
+#[test]
+fn bulk_uninstall_trashes_only_managed_copies() {
+    let temp = tempfile::tempdir().unwrap();
+    let roots = roots(temp.path());
+    fixture(&roots);
+    let plugin = temp.path().join("plugin");
+    for id in ["alpha", "beta"] {
+        fs::create_dir_all(plugin.join(id)).unwrap();
+        fs::write(plugin.join(id).join("SKILL.md"), format!("managed {id}")).unwrap();
+    }
+    let state = scan_state(&roots, &temp.path().join("missing-config"), &[ManagedRoot {
+        agent: Agent::Omp, path: plugin.clone(), kind: ManagedKind::Plugin, plugin: Some("vendor".into()),
+    }]).unwrap();
+    let sources = vec![plugin.join("alpha"), plugin.join("beta")];
+    let entries = plan_bulk_uninstall(&state.skills, &roots, &sources).unwrap();
+    assert_eq!(entries.len(), 2);
+    let expected: Vec<_> = entries.iter().map(|entry| entry.plan.clone()).collect();
+    let trash_dir = temp.path().join("Trash");
+    uninstall_bulk_confirmed_with(&state.skills, &roots, &sources, &expected, |path| trash(path, &trash_dir)).unwrap();
+    assert!(!plugin.join("alpha").exists() && !plugin.join("beta").exists());
+    assert_eq!(fs::read_to_string(trash_dir.join("alpha/SKILL.md")).unwrap(), "managed alpha");
+    assert_eq!(fs::read_to_string(trash_dir.join("beta/SKILL.md")).unwrap(), "managed beta");
+    assert!(roots[0].path.join("alpha/SKILL.md").exists());
+}
+
+#[test]
+fn root_scope_uninstall_handles_a_nested_copy() {
+    let temp = tempfile::tempdir().unwrap();
+    let claude = Root { agent: Agent::ClaudeCode, path: temp.path().join("claude") };
+    let hermes = Root { agent: Agent::Hermes, path: temp.path().join("hermes") };
+    let roots = vec![claude.clone(), hermes.clone()];
+    let nested = hermes.path.join("group/alpha");
+    fs::create_dir_all(claude.path.join("alpha")).unwrap();
+    fs::write(claude.path.join("alpha/SKILL.md"), "one").unwrap();
+    fs::create_dir_all(hermes.path.join("group")).unwrap();
+    symlink(claude.path.join("alpha"), &nested).unwrap();
+    let skills = scan(&roots).unwrap();
+    let alpha = skills.iter().find(|s| s.id == "alpha").unwrap().clone();
+    let plan = plan_uninstall(&skills, &roots, &alpha, UninstallScope::Root(hermes.path.clone())).unwrap();
+    assert_eq!(plan.actions, vec![UninstallAction::RemoveLink { path: nested.clone() }]);
 }

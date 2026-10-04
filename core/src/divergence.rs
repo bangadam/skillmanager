@@ -1,8 +1,8 @@
 use crate::{find_skill, markdown, scan, PresenceKind, Root, SkillState};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{fs, io, os::unix::fs::symlink, path::{Path, PathBuf}};
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct DivergentPair {
     pub left: PathBuf,
     pub right: PathBuf,
@@ -29,12 +29,15 @@ pub(crate) fn divergent_pairs(skill: &SkillState) -> io::Result<Vec<DivergentPai
     Ok(pairs)
 }
 
-fn copy<'a>(skill: &'a SkillState, roots: &[Root], root: &Path) -> io::Result<&'a crate::Presence> {
-    if !roots.iter().any(|configured| configured.path == root) {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("{} is not a configured root", root.display())));
+fn copy<'a>(skill: &'a SkillState, roots: &[Root], path: &Path) -> io::Result<&'a crate::Presence> {
+    if !roots.iter().any(|configured| configured.path == path)
+        && !skill.presences.iter().any(|presence| presence.path == path) {
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("{} is not a configured root or a copy of {}", path.display(), skill.id)));
     }
-    skill.presences.iter().find(|copy| copy.path == root.join(&skill.id))
-        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, format!("{} has no copy of {}", root.display(), skill.id)))
+    skill.presences.iter().find(|copy| copy.path == path)
+        .or_else(|| roots.iter().find(|configured| configured.path == path)
+            .and_then(|configured| skill.presences.iter().find(|copy| copy.path == configured.path.join(&skill.id))))
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, format!("{} has no copy of {}", path.display(), skill.id)))
 }
 
 

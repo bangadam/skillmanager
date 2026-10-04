@@ -72,14 +72,12 @@ fn rename_skill(id: String, new_name: String) -> Result<skillmanager_core::ScanS
 }
 
 #[tauri::command]
-fn missing_skills() -> Result<Vec<skillmanager_core::SkillState>, String> {
-    let state = scan_skills()?;
+fn missing_skills(state: skillmanager_core::ScanState) -> Result<Vec<skillmanager_core::SkillState>, String> {
     Ok(skillmanager_core::missing(&state.skills, &state.roots).into_iter().cloned().collect())
 }
 
 #[tauri::command]
-fn find_duplicates() -> Result<Vec<skillmanager_core::DuplicatePair>, String> {
-    let state = scan_skills()?;
+fn find_duplicates(state: skillmanager_core::ScanState) -> Result<Vec<skillmanager_core::DuplicatePair>, String> {
     skillmanager_core::find_duplicates(&state.skills).map_err(|error| error.to_string())
 }
 
@@ -99,6 +97,29 @@ fn uninstall_skill(source_path: String, root: Option<String>, expected_actions: 
     let state = scan_skills()?;
     skillmanager_core::uninstall_confirmed(&state.skills, &state.roots, std::path::Path::new(&source_path), uninstall_scope(root), &expected_actions).map_err(|error| error.to_string())?;
     scan_skills()
+}
+
+#[tauri::command]
+fn plan_bulk_uninstall(source_paths: Vec<String>) -> Result<Vec<skillmanager_core::BulkUninstallEntry>, String> {
+    let state = scan_skills()?;
+    let sources: Vec<std::path::PathBuf> = source_paths.into_iter().map(Into::into).collect();
+    skillmanager_core::plan_bulk_uninstall(&state.skills, &state.roots, &sources).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn uninstall_skills(source_paths: Vec<String>, expected_plans: Vec<skillmanager_core::UninstallPlan>) -> Result<skillmanager_core::ScanState, String> {
+    let state = scan_skills()?;
+    let sources: Vec<std::path::PathBuf> = source_paths.into_iter().map(Into::into).collect();
+    skillmanager_core::uninstall_bulk_confirmed(&state.skills, &state.roots, &sources, &expected_plans).map_err(|error| error.to_string())?;
+    scan_skills()
+}
+
+#[tauri::command]
+fn set_categories(ids: Vec<String>, category: String) -> Result<skillmanager_core::EditResult, String> {
+    let state = scan_skills()?;
+    let files_written = skillmanager_core::set_categories(&state.skills, &state.roots, &ids, &category).map_err(|error| error.to_string())?;
+    // ponytail: the watcher rescan after these writes updates the list; drop this if it proves too slow to race.
+    Ok(skillmanager_core::EditResult { skills: state.skills, files_written })
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -127,7 +148,7 @@ pub fn run() {
             })?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![scan_skills, find_duplicates, configured_roots, link_skill, choose_master, link_everywhere, missing_skills, rename_skill, plan_uninstall, uninstall_skill, skill_diff, replace_with_link, read_skill_md, edit_skill])
+        .invoke_handler(tauri::generate_handler![scan_skills, find_duplicates, configured_roots, link_skill, choose_master, link_everywhere, missing_skills, rename_skill, plan_uninstall, uninstall_skill, plan_bulk_uninstall, uninstall_skills, skill_diff, replace_with_link, read_skill_md, edit_skill, set_categories])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

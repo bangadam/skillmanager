@@ -1,4 +1,4 @@
-use skillmanager_core::{scan, Agent, DateSource, PresenceKind, Root};
+use skillmanager_core::{default_roots, scan, Agent, DateSource, PresenceKind, Root};
 use std::{fs, path::Path};
 
 fn skill(root: &Path, folder: &str, markdown: &str) {
@@ -33,21 +33,58 @@ fn groups_by_folder_and_reports_display_metadata_and_each_agent_copy() {
 }
 
 #[test]
-fn ignores_missing_roots_non_skills_and_nested_subfolders() {
+fn finds_skills_nested_in_group_folders_but_not_hidden_or_loose_files() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().join("skills");
     fs::create_dir(&root).unwrap();
-    fs::create_dir(root.join("not-a-skill")).unwrap();
+    fs::create_dir(root.join("group")).unwrap();
     fs::write(root.join("loose.md"), "---\nname: loose\n---").unwrap();
-    skill(&root.join("not-a-skill"), "nested", "---\nname: nested\n---");
-    assert!(scan(&[Root { agent: Agent::Cursor, path: root.clone() }]).unwrap().is_empty());
+    skill(&root.join("group"), "nested", "---\nname: nested\n---");
+    skill(&root.join(".archive"), "archived", "---\nname: archived\n---");
+    let result = scan(&[Root { agent: Agent::Hermes, path: root.clone() }]).unwrap();
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0].id, "nested");
+    assert_eq!(result[0].name, "nested");
+    assert_eq!(result[0].presences[0].path, root.join("group/nested"));
+    assert_eq!(result[0].presences[0].kind, PresenceKind::RealDir);
     assert!(scan(&[Root { agent: Agent::Omp, path: root.join("absent") }]).unwrap().is_empty());
     skill(&root, "visible", "Text without frontmatter");
-    let result = scan(&[Root { agent: Agent::Cursor, path: root }]).unwrap();
-    assert_eq!(result.len(), 1);
-    assert_eq!(result[0].id, "visible");
-    assert_eq!(result[0].name, "visible");
-    assert_eq!(result[0].description, "");
+    let result = scan(&[Root { agent: Agent::Hermes, path: root }]).unwrap();
+    assert_eq!(result.len(), 2);
+    assert_eq!(result[1].id, "visible");
+}
+
+#[test]
+fn folder_without_skills_stays_a_same_name_presence_not_a_group() {
+    let temp = tempfile::tempdir().unwrap();
+    let claude = temp.path().join("claude");
+    let hermes = temp.path().join("hermes");
+    fs::create_dir_all(&claude).unwrap();
+    fs::create_dir_all(&hermes).unwrap();
+    skill(&claude, "alpha", "---\nname: Alpha\n---\nbody");
+    let broken = hermes.join("alpha");
+    fs::create_dir(&broken).unwrap();
+    fs::write(broken.join("notes.txt"), "stray").unwrap();
+    skill(&hermes.join("group"), "beta", "---\nname: Beta\n---\nbody");
+    let result = scan(&[
+        Root { agent: Agent::ClaudeCode, path: claude },
+        Root { agent: Agent::Hermes, path: hermes.clone() },
+    ]).unwrap();
+    assert_eq!(result.len(), 2);
+    let alpha = result.iter().find(|s| s.id == "alpha").unwrap();
+    assert_eq!(alpha.presences.len(), 2);
+    assert_eq!(alpha.presences[1].path, broken);
+    let beta = result.iter().find(|s| s.id == "beta").unwrap();
+    assert_eq!(beta.presences.len(), 1);
+    assert_eq!(beta.presences[0].path, hermes.join("group/beta"));
+}
+
+#[test]
+fn default_roots_cover_all_five_agents() {
+    let roots = default_roots().unwrap();
+    assert_eq!(roots.iter().map(|root| root.agent).collect::<Vec<_>>(),
+        [Agent::ClaudeCode, Agent::Codex, Agent::Cursor, Agent::Omp, Agent::Hermes]);
+    assert!(roots.iter().any(|root| root.agent == Agent::Hermes && root.path.ends_with(".hermes/skills")));
 }
 
 #[test]

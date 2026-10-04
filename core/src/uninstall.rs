@@ -1,4 +1,4 @@
-use crate::{scan, PresenceKind, Root, SkillState};
+use crate::{covers, scan, PresenceKind, Root, SkillState};
 use serde::{Deserialize, Serialize};
 use std::{fs, io, os::unix::fs::symlink, path::{Path, PathBuf}};
 
@@ -14,7 +14,7 @@ pub enum UninstallAction {
     TrashMaster { path: PathBuf },
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct UninstallPlan { pub actions: Vec<UninstallAction> }
 
 // Callers pass a skills list scanned immediately before the call; the confirmed flow's
@@ -38,29 +38,30 @@ pub fn plan_uninstall(skills: &[SkillState], roots: &[Root], skill: &SkillState,
         return Err(io::Error::other("Skill copies changed since the dialog opened; close and reopen it"));
     }
     let real: Vec<_> = current.presences.iter().filter(|presence| presence.kind == PresenceKind::RealDir).collect();
-    if real.len() != 1 {
-        return Err(io::Error::other("Uninstall requires one master copy; choose a master for unlinked duplicates first"));
-    }
-    let master = &real[0].path;
-    for link in current.presences.iter().filter(|presence| presence.kind == PresenceKind::Link) {
-        if fs::canonicalize(&link.path)? != fs::canonicalize(master)? {
-            return Err(io::Error::other(format!("{} points to another master; resolve it before uninstalling", link.path.display())));
-        }
-    }
+    // Everywhere trashes every real copy; no master is needed because nothing is kept.
     let actions = match scope {
         UninstallScope::Everywhere => {
             let mut actions: Vec<_> = current.presences.iter().filter(|presence| presence.kind == PresenceKind::Link)
                 .map(|presence| UninstallAction::RemoveLink { path: presence.path.clone() }).collect();
-            actions.push(UninstallAction::TrashMaster { path: master.clone() });
+            actions.extend(real.iter().map(|presence| UninstallAction::TrashMaster { path: presence.path.clone() }));
             actions
         }
         UninstallScope::Root(root) => {
-            if !roots.iter().any(|configured| configured.path == root) {
-                return Err(io::Error::new(io::ErrorKind::InvalidInput, "Root is not configured"));
+            if real.len() != 1 {
+                return Err(io::Error::other("Removing from one agent requires one master copy; choose a master for unlinked duplicates first"));
             }
-            let selected = root.join(&skill.id);
-            let presence = current.presences.iter().find(|presence| presence.path == selected)
+            let master = &real[0].path;
+            let master_target = fs::canonicalize(master)?;
+            for link in current.presences.iter().filter(|presence| presence.kind == PresenceKind::Link) {
+                if fs::canonicalize(&link.path)? != master_target {
+                    return Err(io::Error::other(format!("{} points to another master; resolve it before uninstalling", link.path.display())));
+                }
+            }
+            let configured = roots.iter().find(|configured| configured.path == root)
+                .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Root is not configured"))?;
+            let presence = current.presences.iter().find(|presence| covers(configured, &skill.id, presence))
                 .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Skill is not installed in that root"))?;
+            let selected = presence.path.clone();
             if presence.kind == PresenceKind::Link {
                 vec![UninstallAction::RemoveLink { path: selected }]
             } else {
@@ -104,6 +105,11 @@ pub fn uninstall(skills: &[SkillState], roots: &[Root], skill: &SkillState, scop
 // ponytail: this fixture hook observes Trash ordering; production always calls the macOS Trash library.
 pub fn uninstall_with(skills: &[SkillState], roots: &[Root], skill: &SkillState, scope: UninstallScope, mut trash: impl FnMut(&Path) -> io::Result<()>) -> io::Result<Vec<SkillState>> {
     let plan = plan_uninstall(skills, roots, skill, scope)?;
+    execute_plan(&plan, &mut trash)?;
+    scan(roots)
+}
+
+fn execute_plan(plan: &UninstallPlan, trash: &mut impl FnMut(&Path) -> io::Result<()>) -> io::Result<()> {
     let master = plan.actions.iter().find_map(|action| match action {
         UninstallAction::TrashMaster { path } => Some(path.as_path()), _ => None,
     });
@@ -115,7 +121,7 @@ pub fn uninstall_with(skills: &[SkillState], roots: &[Root], skill: &SkillState,
             UninstallAction::TrashMaster { path } => trash(path)?,
         }
     }
-    scan(roots)
+    Ok(())
 }
 
 pub fn uninstall_confirmed(skills: &[SkillState], roots: &[Root], source: &Path, scope: UninstallScope, expected: &[UninstallAction]) -> io::Result<Vec<SkillState>> {
@@ -130,6 +136,37 @@ pub fn uninstall_confirmed_with(skills: &[SkillState], roots: &[Root], source: &
         return Err(io::Error::other("Affected paths changed; review the plan again before uninstalling"));
     }
     uninstall_with(skills, roots, &skill, scope, trash)
+}
+
+#[derive(Debug, Serialize)]
+pub struct BulkUninstallEntry { pub name: String, pub plan: UninstallPlan }
+
+pub fn plan_bulk_uninstall(skills: &[SkillState], roots: &[Root], sources: &[PathBuf]) -> io::Result<Vec<BulkUninstallEntry>> {
+    sources.iter().map(|source| {
+        let skill = uninstall_target(skills, source)?;
+        Ok(BulkUninstallEntry { name: skill.name.clone(), plan: plan_uninstall(skills, roots, &skill, UninstallScope::Everywhere)? })
+    }).collect()
+}
+
+pub fn uninstall_bulk_confirmed(skills: &[SkillState], roots: &[Root], sources: &[PathBuf], expected: &[UninstallPlan]) -> io::Result<()> {
+    uninstall_bulk_confirmed_with(skills, roots, sources, expected, |path| trash::delete(path).map_err(io::Error::other))
+}
+
+// Same drift guard as the single-skill flow, checked for every skill against one fresh scan.
+pub fn uninstall_bulk_confirmed_with(skills: &[SkillState], roots: &[Root], sources: &[PathBuf], expected: &[UninstallPlan], mut trash: impl FnMut(&Path) -> io::Result<()>) -> io::Result<()> {
+    if sources.len() != expected.len() {
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, "The plan does not match the requested skills"));
+    }
+    let entries = plan_bulk_uninstall(skills, roots, sources)?;
+    for (entry, expected_plan) in entries.iter().zip(expected) {
+        if entry.plan.actions != expected_plan.actions {
+            return Err(io::Error::other("Affected paths changed; review the plan again before uninstalling"));
+        }
+    }
+    for entry in &entries {
+        execute_plan(&entry.plan, &mut trash)?;
+    }
+    Ok(())
 }
 
 fn spare_path(path: &Path) -> io::Result<PathBuf> {

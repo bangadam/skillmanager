@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import type { SkillState } from "@/views/all";
 
-const agents = { claude_code: "Claude Code", codex: "Codex", cursor: "Cursor", omp: "omp" };
+import { agentMeta } from "@/components/agent-meta";
 type ScanState = { skills: SkillState[] };
 
 export function RenameDialog({ skill, skills, onRefresh }: { skill: SkillState; skills: SkillState[]; onRefresh: (skills: SkillState[]) => void }) {
@@ -42,7 +42,7 @@ export function RenameDialog({ skill, skills, onRefresh }: { skill: SkillState; 
       <Input id={`rename-${skill.id}`} value={name} onChange={(event) => { setName(event.target.value); setError(null); }} aria-invalid={!!validation || !!error} aria-describedby={`rename-feedback-${skill.id}`} autoFocus />
       <p id={`rename-feedback-${skill.id}`} role={validation || error ? "alert" : undefined} className="text-sm text-destructive">{error || validation}</p>
       <div className="space-y-1 text-sm"><p className="font-medium">Folders that will move</p>
-        <ul className="max-h-44 space-y-1 overflow-auto text-muted-foreground">{skill.presences.map((presence) => <li key={presence.path} className="break-all">{agents[presence.agent]} · {presence.path} {presence.kind === "link" ? "(link)" : "(master)"} → {name || "…"}</li>)}</ul>
+        <ul className="max-h-44 space-y-1 overflow-auto text-muted-foreground">{skill.presences.map((presence) => <li key={presence.path} className="break-all">{agentMeta[presence.agent].label} · {presence.path} {presence.kind === "link" ? "(link)" : "(master)"} → {name || "…"}</li>)}</ul>
       </div>
       <DialogFooter><Button variant="outline" disabled={busy} onClick={() => setOpen(false)}>Cancel</Button><Button disabled={busy || !!validation} onClick={submit}>{busy ? "Renaming…" : "Confirm rename"}</Button></DialogFooter>
     </DialogContent>

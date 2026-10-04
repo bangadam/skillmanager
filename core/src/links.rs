@@ -1,4 +1,4 @@
-use crate::{find_skill, scan, PresenceKind, Root, SkillState};
+use crate::{covers, find_skill, scan, PresenceKind, Root, SkillState};
 use std::{collections::BTreeMap, fs, io, os::unix::fs::symlink, path::{Path, PathBuf}};
 use serde::Serialize;
 
@@ -11,7 +11,7 @@ pub struct LinkEverywhereResult {
 pub fn missing<'a>(skills: &'a [SkillState], roots: &[Root]) -> Vec<&'a SkillState> {
     skills.iter().filter(|skill| {
         skill.managed_source.is_none() && !skill.presences.is_empty()
-            && roots.iter().any(|root| !skill.presences.iter().any(|presence| presence.path == root.path.join(&skill.id)))
+            && roots.iter().any(|root| !skill.presences.iter().any(|presence| covers(root, &skill.id, presence)))
     }).collect()
 }
 
@@ -38,6 +38,10 @@ fn master(skill: &SkillState) -> io::Result<PathBuf> {
 pub fn link(roots: &[Root], id: &str, target_root: &Path) -> io::Result<Vec<SkillState>> {
     let target_root = root(roots, target_root)?;
     let skill = find_skill(roots, id)?;
+    if let Some(existing) = skill.presences.iter().find(|presence| covers(target_root, id, presence)) {
+        return Err(io::Error::new(io::ErrorKind::AlreadyExists,
+            format!("{} already holds a copy of {id}; resolve or remove that copy before linking", existing.path.display())));
+    }
     let destination = target_root.path.join(id);
     match fs::symlink_metadata(&destination) {
         Ok(_) => return Err(io::Error::new(io::ErrorKind::AlreadyExists,
@@ -53,11 +57,13 @@ pub fn link(roots: &[Root], id: &str, target_root: &Path) -> io::Result<Vec<Skil
 
 pub fn link_everywhere(roots: &[Root], id: &str) -> io::Result<LinkEverywhereResult> {
     let skill = find_skill(roots, id)?;
-    let source = master(&skill)?;
     let mut failures = Vec::new();
     for root in roots {
+        if skill.presences.iter().any(|presence| covers(root, id, presence)) { continue; }
+        // Only uncovered roots need a master to point at; a fully covered skill (e.g. flat
+        // Claude copy plus a nested Hermes group copy) may hold several real copies.
+        let source = master(&skill)?;
         let destination = root.path.join(id);
-        if skill.presences.iter().any(|presence| presence.path == destination) { continue; }
         let result = match fs::symlink_metadata(&destination) {
             Ok(_) => Err(io::Error::new(io::ErrorKind::AlreadyExists, format!("{} already holds a copy of {id}", destination.display()))),
             Err(error) if error.kind() == io::ErrorKind::NotFound =>
@@ -93,12 +99,13 @@ fn contents(path: &Path) -> io::Result<BTreeMap<PathBuf, (u8, Vec<u8>)>> {
 }
 
 fn select_master(roots: &[Root], id: &str, chosen_root: &Path, mut trash: impl FnMut(&Path) -> io::Result<()>) -> io::Result<Vec<SkillState>> {
-    root(roots, chosen_root)?;
+    let chosen_root = root(roots, chosen_root)?;
     let skill = find_skill(roots, id)?;
-    let chosen = chosen_root.join(id);
-    if !skill.presences.iter().any(|presence| presence.path == chosen && presence.kind == PresenceKind::RealDir) {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("{} is not a real copy of {id}", chosen.display())));
-    }
+    let chosen = skill.presences.iter()
+        .find(|presence| presence.kind == PresenceKind::RealDir && covers(chosen_root, id, presence))
+        .map(|presence| presence.path.clone())
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput,
+            format!("{} is not a real copy of {id}", chosen_root.path.join(id).display())))?;
     let original = contents(&chosen)?;
     let copies: Vec<_> = skill.presences.iter().filter(|presence| presence.kind == PresenceKind::RealDir && presence.path != chosen).collect();
     // Validate every copy before any move: divergent content must not be touched.

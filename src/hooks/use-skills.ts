@@ -1,15 +1,26 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { SkillState } from "@/views/all";
+import type { Root } from "@/views/missing";
 
-type ScanState = { skills: SkillState[]; config_error: string | null; config_notice: string | null };
+type ScanState = { skills: SkillState[]; roots: Root[]; config_error: string | null; config_notice: string | null };
 
 export function useSkills() {
   const [skills, setSkills] = useState<SkillState[] | null>(null);
+  const [roots, setRoots] = useState<Root[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const [configNotice, setConfigNotice] = useState<string | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+
+  const apply = (state: ScanState) => {
+    setSkills(state.skills);
+    setRoots(state.roots);
+    setConfigError(state.config_error);
+    setConfigNotice(state.config_notice);
+    setUpdatedAt(Date.now());
+  };
 
   useEffect(() => {
     let active = true;
@@ -20,9 +31,7 @@ export function useSkills() {
         unlisten = await listen<ScanState>("skills-changed", ({ payload }) => {
           if (!active) return;
           eventArrived = true;
-          setSkills(payload.skills);
-          setConfigError(payload.config_error);
-          setConfigNotice(payload.config_notice);
+          apply(payload);
           setError(null);
         });
         if (!active) { unlisten(); return; }
@@ -32,9 +41,7 @@ export function useSkills() {
       try {
         const result = await invoke<ScanState>("scan_skills");
         if (active && !eventArrived) {
-          setSkills(result.skills);
-          setConfigError(result.config_error);
-          setConfigNotice(result.config_notice);
+          apply(result);
           setError(null);
         }
       } catch (reason) {
@@ -45,5 +52,14 @@ export function useSkills() {
     return () => { active = false; unlisten?.(); };
   }, []);
 
-  return { skills, setSkills, error, configError, configNotice };
+  const refresh = useCallback(async () => {
+    try {
+      apply(await invoke<ScanState>("scan_skills"));
+      setError(null);
+    } catch (reason) {
+      setError(String(reason));
+    }
+  }, []);
+
+  return { skills, setSkills, roots, error, configError, configNotice, updatedAt, refresh };
 }

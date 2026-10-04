@@ -2,14 +2,12 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Badge } from "@/components/ui/badge";
 
-type Agent = "claude_code" | "codex" | "cursor" | "omp";
+import type { Agent, SkillState } from "@/views/all";
+import { agentMeta } from "@/components/agent-meta";
+
 type Copy = { agent: Agent; path: string; kind: "real_dir" | "link" };
 type Skill = { id: string; name: string; presences: Copy[] };
 type Pair = { a: Skill; b: Skill; similarity: number; is_exact: boolean };
-
-const agentNames: Record<Agent, string> = {
-  claude_code: "Claude Code", codex: "Codex", cursor: "Cursor", omp: "omp",
-};
 
 function Copies({ skill }: { skill: Skill }) {
   return (
@@ -18,8 +16,7 @@ function Copies({ skill }: { skill: Skill }) {
       <ul className="space-y-2">
         {skill.presences.map((copy) => (
           <li key={copy.path} className="flex flex-wrap items-center gap-2 text-sm">
-            <Badge variant="secondary">{agentNames[copy.agent]}</Badge>
-            <Badge variant="outline">{copy.kind === "link" ? "Link" : "Real copy"}</Badge>
+            <Badge variant="secondary">{agentMeta[copy.agent].label}</Badge>
             <span className="min-w-0 break-all text-muted-foreground">{copy.path}</span>
           </li>
         ))}
@@ -28,14 +25,15 @@ function Copies({ skill }: { skill: Skill }) {
   );
 }
 
-export default function DuplicatesView({ skills, onGoToMissing }: { skills: unknown[] | null; onGoToMissing?: () => void }) {
+export default function DuplicatesView({ skills, onGoToMissing }: { skills: SkillState[] | null; onGoToMissing?: () => void }) {
   const [pairs, setPairs] = useState<Pair[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Compares the already-scanned skills in Rust; no hidden rescan.
   useEffect(() => {
     if (!skills) return;
     let active = true;
-    invoke<Pair[]>("find_duplicates").then(
+    invoke<Pair[]>("find_duplicates", { state: { skills } }).then(
       (result) => { if (active) { setPairs(result); setError(null); } },
       (reason: unknown) => { if (active) setError(String(reason)); },
     );
@@ -46,7 +44,7 @@ export default function DuplicatesView({ skills, onGoToMissing }: { skills: unkn
   if (!pairs) return <p role="status" className="py-12 text-muted-foreground">Comparing skill files…</p>;
 
   return (
-    <section aria-label="Duplicate skills">
+    <section aria-label="Duplicate skills" className="p-3">
       <p className="mb-5 text-sm tabular-nums text-muted-foreground" aria-live="polite">{pairs.length} {pairs.length === 1 ? "duplicate pair" : "duplicate pairs"}{pairs.length > 0 && ". Select a pair to see every copy."}</p>
       {pairs.length === 0 && <p className="rounded-md border border-dashed border-border py-16 text-center text-muted-foreground">No similar skills found. Nothing to reconcile.</p>}
       <div className="space-y-3">

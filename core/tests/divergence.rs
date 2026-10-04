@@ -92,3 +92,26 @@ fn symlinked_copy_does_not_warn_when_it_points_to_master() {
     symlink(roots[0].path.join("alpha"), roots[1].path.join("alpha")).unwrap();
     assert!(scan(&roots).unwrap()[0].divergent_pairs.is_empty());
 }
+
+#[test]
+fn diff_and_replace_accept_nested_presence_paths() {
+    let temp = tempfile::tempdir().unwrap();
+    let claude = Root { agent: Agent::ClaudeCode, path: temp.path().join("claude") };
+    let hermes = Root { agent: Agent::Hermes, path: temp.path().join("hermes") };
+    let roots = vec![claude.clone(), hermes.clone()];
+    let nested = hermes.path.join("group/alpha");
+    fs::create_dir_all(claude.path.join("alpha")).unwrap();
+    fs::write(claude.path.join("alpha/SKILL.md"), "master text").unwrap();
+    fs::create_dir_all(&nested).unwrap();
+    fs::write(nested.join("SKILL.md"), "divergent text").unwrap();
+    let skills = scan(&roots).unwrap();
+    assert_eq!(skills.iter().find(|s| s.id == "alpha").unwrap().divergent_pairs.len(), 1);
+
+    let diff = skill_diff(&roots, "alpha", &nested, &claude.path.join("alpha")).unwrap();
+    assert_eq!((diff.left.as_deref(), diff.right.as_deref()), (Some("divergent text"), Some("master text")));
+
+    let skills = replace_with_link_in(&roots, "alpha", &nested, &claude.path.join("alpha"), &temp.path().join("trash")).unwrap();
+    let alpha = skills.iter().find(|s| s.id == "alpha").unwrap();
+    assert_eq!(alpha.divergent_pairs.len(), 0);
+    assert_eq!(fs::read_link(&nested).unwrap(), claude.path.join("alpha"));
+}
