@@ -91,13 +91,13 @@ fn uninstall_scope(root: Option<String>) -> skillmanager_core::UninstallScope {
 #[tauri::command]
 fn plan_uninstall(source_path: String, root: Option<String>) -> Result<skillmanager_core::UninstallPlan, String> {
     let state = scan_skills()?;
-    skillmanager_core::plan_uninstall_source(&state.roots, std::path::Path::new(&source_path), uninstall_scope(root)).map_err(|error| error.to_string())
+    skillmanager_core::plan_uninstall_source(&state.skills, &state.roots, std::path::Path::new(&source_path), uninstall_scope(root)).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
 fn uninstall_skill(source_path: String, root: Option<String>, expected_actions: Vec<skillmanager_core::UninstallAction>) -> Result<skillmanager_core::ScanState, String> {
     let state = scan_skills()?;
-    skillmanager_core::uninstall_confirmed(&state.roots, std::path::Path::new(&source_path), uninstall_scope(root), &expected_actions).map_err(|error| error.to_string())?;
+    skillmanager_core::uninstall_confirmed(&state.skills, &state.roots, std::path::Path::new(&source_path), uninstall_scope(root), &expected_actions).map_err(|error| error.to_string())?;
     scan_skills()
 }
 

@@ -6,7 +6,7 @@ use std::{fs, io, path::{Path, PathBuf}};
 #[serde(rename_all = "snake_case")]
 pub enum ManagedKind { Plugin, BuiltIn }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct ManagedSource {
     pub agent: Agent,
     pub kind: ManagedKind,

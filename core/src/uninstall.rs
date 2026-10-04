@@ -17,23 +17,24 @@ pub enum UninstallAction {
 #[derive(Debug, Serialize)]
 pub struct UninstallPlan { pub actions: Vec<UninstallAction> }
 
-fn uninstall_target(roots: &[Root], source: &Path) -> io::Result<SkillState> {
-    scan(roots)?.into_iter().find(|skill| skill.presences.iter().any(|copy| copy.path == source))
+// Callers pass a skills list scanned immediately before the call; the confirmed flow's
+// expected-actions comparison is the drift guard between plan and execute.
+fn uninstall_target(skills: &[SkillState], source: &Path) -> io::Result<SkillState> {
+    skills.iter().find(|skill| skill.presences.iter().any(|copy| copy.path == source)).cloned()
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Skill is no longer available; refresh and try again"))
 }
 
-pub fn plan_uninstall_source(roots: &[Root], source: &Path, scope: UninstallScope) -> io::Result<UninstallPlan> {
-    plan_uninstall(roots, &uninstall_target(roots, source)?, scope)
+pub fn plan_uninstall_source(skills: &[SkillState], roots: &[Root], source: &Path, scope: UninstallScope) -> io::Result<UninstallPlan> {
+    plan_uninstall(skills, roots, &uninstall_target(skills, source)?, scope)
 }
 
-pub fn plan_uninstall(roots: &[Root], skill: &SkillState, scope: UninstallScope) -> io::Result<UninstallPlan> {
+pub fn plan_uninstall(skills: &[SkillState], roots: &[Root], skill: &SkillState, scope: UninstallScope) -> io::Result<UninstallPlan> {
     if skill.managed_source.is_some() {
-        return Err(io::Error::new(io::ErrorKind::PermissionDenied, "Cannot uninstall a managed plugin or built-in skill"));
+        return plan_managed_uninstall(skills, skill, scope);
     }
-    let current = scan(roots)?.into_iter().find(|item| item.id == skill.id)
+    let current = skills.iter().find(|item| item.id == skill.id && item.managed_source.is_none())
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Skill is no longer in a configured root"))?;
-    if skill.presences.len() != current.presences.len() ||
-        skill.presences.iter().any(|presence| !current.presences.iter().any(|now| now == presence)) {
+    if skill.presences != current.presences {
         return Err(io::Error::other("Skill copies changed since the dialog opened; close and reopen it"));
     }
     let real: Vec<_> = current.presences.iter().filter(|presence| presence.kind == PresenceKind::RealDir).collect();
@@ -77,13 +78,32 @@ pub fn plan_uninstall(roots: &[Root], skill: &SkillState, scope: UninstallScope)
     Ok(UninstallPlan { actions })
 }
 
-pub fn uninstall(roots: &[Root], skill: &SkillState, scope: UninstallScope) -> io::Result<Vec<SkillState>> {
-    uninstall_with(roots, skill, scope, |path| trash::delete(path).map_err(io::Error::other))
+// Managed (plugin/built-in) rows: removal means trashing the agent's cached copy.
+// ponytail: the agent's plugin updater may re-sync the skill later; we do not track or block that.
+fn plan_managed_uninstall(skills: &[SkillState], skill: &SkillState, scope: UninstallScope) -> io::Result<UninstallPlan> {
+    let current = skills.iter().find(|item| item.id == skill.id && item.managed_source.is_some() && item.managed_source == skill.managed_source)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Skill is no longer in its managed source; refresh and try again"))?;
+    let selected: Vec<_> = match scope {
+        UninstallScope::Everywhere => current.presences.iter().collect(),
+        UninstallScope::Root(root) => {
+            let in_root: Vec<_> = current.presences.iter().filter(|presence| presence.path.parent() == Some(root.as_path())).collect();
+            if in_root.is_empty() {
+                return Err(io::Error::new(io::ErrorKind::NotFound, "Skill is not installed in that root"));
+            }
+            in_root
+        }
+    };
+    Ok(UninstallPlan { actions: selected.into_iter()
+        .map(|presence| UninstallAction::TrashMaster { path: presence.path.clone() }).collect() })
+}
+
+pub fn uninstall(skills: &[SkillState], roots: &[Root], skill: &SkillState, scope: UninstallScope) -> io::Result<Vec<SkillState>> {
+    uninstall_with(skills, roots, skill, scope, |path| trash::delete(path).map_err(io::Error::other))
 }
 
 // ponytail: this fixture hook observes Trash ordering; production always calls the macOS Trash library.
-pub fn uninstall_with(roots: &[Root], skill: &SkillState, scope: UninstallScope, mut trash: impl FnMut(&Path) -> io::Result<()>) -> io::Result<Vec<SkillState>> {
-    let plan = plan_uninstall(roots, skill, scope)?;
+pub fn uninstall_with(skills: &[SkillState], roots: &[Root], skill: &SkillState, scope: UninstallScope, mut trash: impl FnMut(&Path) -> io::Result<()>) -> io::Result<Vec<SkillState>> {
+    let plan = plan_uninstall(skills, roots, skill, scope)?;
     let master = plan.actions.iter().find_map(|action| match action {
         UninstallAction::TrashMaster { path } => Some(path.as_path()), _ => None,
     });
@@ -98,18 +118,18 @@ pub fn uninstall_with(roots: &[Root], skill: &SkillState, scope: UninstallScope,
     scan(roots)
 }
 
-pub fn uninstall_confirmed(roots: &[Root], source: &Path, scope: UninstallScope, expected: &[UninstallAction]) -> io::Result<Vec<SkillState>> {
-    uninstall_confirmed_with(roots, source, scope, expected, |path| trash::delete(path).map_err(io::Error::other))
+pub fn uninstall_confirmed(skills: &[SkillState], roots: &[Root], source: &Path, scope: UninstallScope, expected: &[UninstallAction]) -> io::Result<Vec<SkillState>> {
+    uninstall_confirmed_with(skills, roots, source, scope, expected, |path| trash::delete(path).map_err(io::Error::other))
 }
 
 // ponytail: the fixture hook keeps plan confirmation at the core seam while production uses system Trash.
-pub fn uninstall_confirmed_with(roots: &[Root], source: &Path, scope: UninstallScope, expected: &[UninstallAction], trash: impl FnMut(&Path) -> io::Result<()>) -> io::Result<Vec<SkillState>> {
-    let skill = uninstall_target(roots, source)?;
-    let current = plan_uninstall(roots, &skill, scope.clone())?;
+pub fn uninstall_confirmed_with(skills: &[SkillState], roots: &[Root], source: &Path, scope: UninstallScope, expected: &[UninstallAction], trash: impl FnMut(&Path) -> io::Result<()>) -> io::Result<Vec<SkillState>> {
+    let skill = uninstall_target(skills, source)?;
+    let current = plan_uninstall(skills, roots, &skill, scope.clone())?;
     if current.actions != expected {
         return Err(io::Error::other("Affected paths changed; review the plan again before uninstalling"));
     }
-    uninstall_with(roots, &skill, scope, trash)
+    uninstall_with(skills, roots, &skill, scope, trash)
 }
 
 fn spare_path(path: &Path) -> io::Result<PathBuf> {

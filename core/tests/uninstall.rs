@@ -26,7 +26,8 @@ fn everywhere_plans_exact_paths_and_unlinks_before_trashing() {
     let temp = tempfile::tempdir().unwrap();
     let roots = roots(temp.path());
     fixture(&roots);
-    let original = scan(&roots).unwrap().remove(0);
+    let skills = scan(&roots).unwrap();
+    let original = skills[0].clone();
     let master = roots[0].path.join("alpha");
     let link1 = roots[1].path.join("alpha");
     let link2 = roots[2].path.join("alpha");
@@ -35,10 +36,10 @@ fn everywhere_plans_exact_paths_and_unlinks_before_trashing() {
         UninstallAction::RemoveLink { path: link2.clone() },
         UninstallAction::TrashMaster { path: master.clone() },
     ];
-    assert_eq!(plan_uninstall(&roots, &original, UninstallScope::Everywhere).unwrap().actions, expected);
+    assert_eq!(plan_uninstall(&skills, &roots, &original, UninstallScope::Everywhere).unwrap().actions, expected);
     assert!(master.exists() && link1.exists() && link2.exists());
     let trash_dir = temp.path().join("Trash");
-    let result = uninstall_with(&roots, &original, UninstallScope::Everywhere, |path| {
+    let result = uninstall_with(&skills, &roots, &original, UninstallScope::Everywhere, |path| {
         assert!(!link1.exists() && !link2.exists(), "all links must be removed before Trash");
         assert!(fs::symlink_metadata(&link1).is_err() && fs::symlink_metadata(&link2).is_err());
         trash(path, &trash_dir)
@@ -53,9 +54,11 @@ fn stale_uninstall_plan_never_removes_a_copy() {
     let temp = tempfile::tempdir().unwrap();
     let roots = roots(temp.path());
     fixture(&roots);
-    let expected = plan_uninstall(&roots, &scan(&roots).unwrap()[0], UninstallScope::Everywhere).unwrap().actions;
+    let skills = scan(&roots).unwrap();
+    let expected = plan_uninstall(&skills, &roots, &skills[0], UninstallScope::Everywhere).unwrap().actions;
     fs::remove_file(roots[2].path.join("alpha")).unwrap();
-    let error = uninstall_confirmed_with(&roots, &roots[0].path.join("alpha"), UninstallScope::Everywhere, &expected, |_| panic!("stale plan must not trash")).unwrap_err();
+    let fresh = scan(&roots).unwrap();
+    let error = uninstall_confirmed_with(&fresh, &roots, &roots[0].path.join("alpha"), UninstallScope::Everywhere, &expected, |_| panic!("stale plan must not trash")).unwrap_err();
     assert!(error.to_string().contains("review the plan again"));
     assert!(roots[0].path.join("alpha/SKILL.md").exists());
 }
@@ -65,11 +68,12 @@ fn single_agent_unlinks_only_selected_root() {
     let temp = tempfile::tempdir().unwrap();
     let roots = roots(temp.path());
     fixture(&roots);
-    let original = scan(&roots).unwrap().remove(0);
+    let skills = scan(&roots).unwrap();
+    let original = skills[0].clone();
     let selected = roots[1].path.join("alpha");
-    assert_eq!(plan_uninstall(&roots, &original, UninstallScope::Root(roots[1].path.clone())).unwrap().actions,
+    assert_eq!(plan_uninstall(&skills, &roots, &original, UninstallScope::Root(roots[1].path.clone())).unwrap().actions,
         vec![UninstallAction::RemoveLink { path: selected.clone() }]);
-    let result = uninstall_with(&roots, &original, UninstallScope::Root(roots[1].path.clone()), |_| panic!("no real content should be trashed")).unwrap();
+    let result = uninstall_with(&skills, &roots, &original, UninstallScope::Root(roots[1].path.clone()), |_| panic!("no real content should be trashed")).unwrap();
     assert_eq!(result[0].presences.len(), 2);
     assert!(fs::symlink_metadata(selected).is_err());
     assert_eq!(fs::read_to_string(roots[2].path.join("alpha/SKILL.md")).unwrap(), "original");
@@ -83,11 +87,12 @@ fn removing_master_root_promotes_a_copy_and_repoints_every_remaining_link_before
     fs::create_dir_all(roots[0].path.join("alpha/assets")).unwrap();
     fs::write(roots[0].path.join("alpha/assets/icon"), b"image").unwrap();
     symlink(roots[0].path.join("alpha/assets/icon"), roots[0].path.join("alpha/icon-link")).unwrap();
-    let original = scan(&roots).unwrap().remove(0);
+    let skills = scan(&roots).unwrap();
+    let original = skills[0].clone();
     let old = roots[0].path.join("alpha");
     let promoted = roots[1].path.join("alpha");
     let remaining = roots[2].path.join("alpha");
-    let plan = plan_uninstall(&roots, &original, UninstallScope::Root(roots[0].path.clone())).unwrap();
+    let plan = plan_uninstall(&skills, &roots, &original, UninstallScope::Root(roots[0].path.clone())).unwrap();
     assert_eq!(plan.actions, vec![
         UninstallAction::Promote { path: promoted.clone() },
         UninstallAction::RepointLink { path: remaining.clone(), target: promoted.clone() },
@@ -95,7 +100,7 @@ fn removing_master_root_promotes_a_copy_and_repoints_every_remaining_link_before
     ]);
     assert!(fs::symlink_metadata(&promoted).unwrap().file_type().is_symlink());
     let trash_dir = temp.path().join("Trash");
-    let result = uninstall_with(&roots, &original, UninstallScope::Root(roots[0].path.clone()), |path| {
+    let result = uninstall_with(&skills, &roots, &original, UninstallScope::Root(roots[0].path.clone()), |path| {
         assert_eq!(fs::read_link(&remaining).unwrap(), promoted);
         assert!(fs::symlink_metadata(&promoted).unwrap().is_dir());
         assert_eq!(fs::read(promoted.join("assets/icon")).unwrap(), b"image");
@@ -116,29 +121,39 @@ fn only_copy_refuses_single_root_but_everywhere_works() {
     fixture(&roots);
     fs::remove_file(roots[1].path.join("alpha")).unwrap();
     fs::remove_file(roots[2].path.join("alpha")).unwrap();
-    let original = scan(&roots).unwrap().remove(0);
-    let error = plan_uninstall(&roots, &original, UninstallScope::Root(roots[0].path.clone())).unwrap_err().to_string();
+    let skills = scan(&roots).unwrap();
+    let original = skills[0].clone();
+    let error = plan_uninstall(&skills, &roots, &original, UninstallScope::Root(roots[0].path.clone())).unwrap_err().to_string();
     assert!(error.contains("everywhere"), "{error}");
-    assert!(uninstall_with(&roots, &original, UninstallScope::Root(roots[0].path.clone()), |_| panic!("must refuse" )).is_err());
+    assert!(uninstall_with(&skills, &roots, &original, UninstallScope::Root(roots[0].path.clone()), |_| panic!("must refuse" )).is_err());
     assert!(roots[0].path.join("alpha/SKILL.md").is_file());
     let trash_dir = temp.path().join("Trash");
-    assert!(uninstall_with(&roots, &original, UninstallScope::Everywhere, |path| trash(path, &trash_dir)).unwrap().is_empty());
+    assert!(uninstall_with(&skills, &roots, &original, UninstallScope::Everywhere, |path| trash(path, &trash_dir)).unwrap().is_empty());
     assert_eq!(fs::read_to_string(trash_dir.join("alpha/SKILL.md")).unwrap(), "original");
 }
 
 #[test]
-fn managed_skill_is_refused_even_when_its_id_matches_a_personal_skill() {
+fn uninstalling_a_managed_row_trashes_only_the_cached_copy() {
     let temp = tempfile::tempdir().unwrap();
     let roots = roots(temp.path());
     fixture(&roots);
     let plugin = temp.path().join("plugin");
     fs::create_dir_all(plugin.join("alpha")).unwrap();
     fs::write(plugin.join("alpha/SKILL.md"), "managed").unwrap();
-    let state = scan_state(&roots, &temp.path().join("missing-config"), &[ManagedRoot { agent: Agent::Omp, path: plugin.clone(), kind: ManagedKind::Plugin, plugin: None }]).unwrap();
-    let managed = state.skills.iter().find(|s| s.managed_source.is_some()).unwrap();
-    let error = plan_uninstall(&roots, managed, UninstallScope::Everywhere).unwrap_err().to_string();
-    assert!(error.contains("managed"), "{error}");
-    assert!(uninstall_with(&roots, managed, UninstallScope::Everywhere, |_| panic!("must refuse")).is_err());
-    assert!(plugin.join("alpha/SKILL.md").exists());
+    let state = scan_state(&roots, &temp.path().join("missing-config"), &[ManagedRoot {
+        agent: Agent::Omp, path: plugin.clone(), kind: ManagedKind::Plugin, plugin: Some("vendor / plugin".into()),
+    }]).unwrap();
+    let managed = state.skills.iter().find(|skill| skill.managed_source.is_some()).unwrap().clone();
+    assert_eq!(plan_uninstall(&state.skills, &roots, &managed, UninstallScope::Everywhere).unwrap().actions,
+        vec![UninstallAction::TrashMaster { path: plugin.join("alpha") }]);
+    assert_eq!(plan_uninstall(&state.skills, &roots, &managed, UninstallScope::Root(plugin.clone())).unwrap().actions,
+        vec![UninstallAction::TrashMaster { path: plugin.join("alpha") }]);
+    let missing = plan_uninstall(&state.skills, &roots, &managed, UninstallScope::Root(roots[0].path.clone())).unwrap_err().to_string();
+    assert!(missing.contains("not installed in that root"), "{missing}");
+    let trash_dir = temp.path().join("Trash");
+    let result = uninstall_with(&state.skills, &roots, &managed, UninstallScope::Everywhere, |path| trash(path, &trash_dir)).unwrap();
+    assert!(!plugin.join("alpha").exists());
+    assert_eq!(fs::read_to_string(trash_dir.join("alpha/SKILL.md")).unwrap(), "managed");
     assert!(roots[0].path.join("alpha/SKILL.md").exists());
+    assert_eq!(result[0].presences.len(), 3);
 }

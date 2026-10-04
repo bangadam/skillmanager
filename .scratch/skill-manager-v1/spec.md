@@ -41,7 +41,7 @@ A macOS desktop app (Tauri) that shows every skill from every agent in one list,
 27. As a skill owner, I want an uninstall confirmation that lists exactly what will be unlinked and trashed, so that I can't destroy something by accident.
 28. As a skill owner, I want plugin and built-in skills listed with their source, so that I can see everything an agent loads.
 29. As a skill owner, I want a toolbar filter for my skills / plugin skills / built-in skills / all, so that the list separates what I manage from what agents manage.
-30. As a skill owner, I want plugin and built-in skills to have no link/edit/rename/uninstall actions, so that the app never fights an agent's own updater.
+30. As a skill owner, I want plugin and built-in skills to have no link/edit/rename actions (uninstall from the agent's cache is allowed, with a re-sync warning), so that the app never fights an agent's own updater beyond removal I asked for.
 31. As a skill owner, I want the list, the views, and the counts to update live as skills and chats change on disk, so that the app is never stale.
 32. As a skill owner, I want the app to open read-only and only act on my explicit clicks, so that installing it can never reorganize my folders by itself.
 33. As a skill owner, I want the app to launch fast with a full scan of all roots, so that I'm never waiting on a spinner for a hundred skills.
@@ -55,14 +55,14 @@ A macOS desktop app (Tauri) that shows every skill from every agent in one list,
 
 - Greenfield build: Tauri 2 desktop app, single window. Frontend: React with Vite + TypeScript + Tailwind, with shadcn/ui as the component library (copied-in components on Radix primitives). Backend: Rust only, no Node sidecar.
 - Architecture in three layers: a **Rust core crate** (all scanning, comparison, linking, renaming, editing, uninstall, watching logic), a **Tauri command layer** that wraps the core's public API one-to-one and serializes results as JSON, and the **React UI** as a thin view over those commands. The UI holds no filesystem logic.
-- Agents and roots: the four canonical roots (Claude Code, Codex, Cursor, omp personal skills folders) are hardcoded; extra roots come from a plain JSON config file owned by the app. Plugin and built-in skill sources are scanned for display only.
+- Agents and roots: the four canonical roots (Claude Code, Codex, Cursor, omp personal skills folders) are hardcoded; extra roots come from a plain JSON config file owned by the app. Plugin and built-in skill sources are scanned read-only except uninstall (trash the cached copy; a re-sync may restore it).
 - Identity: a skill is its folder name. Frontmatter `name` is display-only and follows renames. Grouping across roots is by folder name.
 - Statelessness: every launch re-scans all roots and derives the full state; nothing is persisted except the roots config and the rename journal (old name, new name, timestamp) — both deletable without harming any agent.
 - Master copy and linking: "Add to" (and "link everywhere") creates a symlink in the target root pointing at the master copy. When unlinked duplicates exist, the user picks the master (default: canonical-root order). All non-master copies become links.
 - Divergence guard: linking, editing, or replacing onto a divergent copy is refused until the user resolves a side-by-side diff; "replace" moves the old copy to the Trash before the link is created.
 - Edit: writes the master copy and every unlinked copy whose text is identical; divergent copies trigger the diff flow before saving.
 - Rename: renames the master folder, relinks every link, updates the SKILL.md frontmatter name, and appends to the rename journal.
-- Uninstall: removes all links first, then moves the master to the macOS Trash via a Trash-aware library. Scope is per-agent or everywhere (default everywhere), chosen in a confirmation that lists every affected path. Plugin and built-in skills are read-only.
+- Uninstall: removes all links first, then moves the master to the macOS Trash via a Trash-aware library. Scope is per-agent or everywhere (default everywhere), chosen in a confirmation that lists every affected path. Managed (plugin/built-in) skills uninstall by trashing the agent's cached copy only, with a re-sync warning.
 - Missing: computed per skill against the full set of configured roots.
 - Duplicates: text-similarity pairing (normalized content comparison); no AI in v1.
 - Live updates: filesystem watcher (debounced) triggers a rescan and pushes refreshed state to the UI.

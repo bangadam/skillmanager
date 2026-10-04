@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { MissingView } from "@/views/missing";
 import { useSkills } from "@/hooks/use-skills";
-import { filterSkills, SkillFilter, type SkillCategory } from "@/components/skill-filter";
+import { AgentFilter, filterByAgent, filterSkills, SkillFilter, type AgentKey, type SkillCategory } from "@/components/skill-filter";
 import { AllView, SkillToolbar } from "@/views/all";
 import type { SkillSort } from "@/views/sort-skills";
 import DuplicatesView from "@/views/duplicates";
@@ -14,6 +14,7 @@ import type { SkillState } from "@/views/all";
 export default function App() {
   const { skills, setSkills, error, configError, configNotice } = useSkills();
   const [category, setCategory] = useState<SkillCategory>("all");
+  const [agent, setAgent] = useState<AgentKey>("any");
   const [view, setView] = useState<"all" | "missing" | "duplicates">("all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SkillSort>("created-desc");
@@ -48,8 +49,9 @@ export default function App() {
             <div className="mb-5 flex flex-wrap items-center gap-3">
               <SkillToolbar query={query} setQuery={setQuery} sort={sort} setSort={setSort} />
               <SkillFilter skills={skills} value={category} onChange={setCategory} />
+              <AgentFilter skills={skills} value={agent} onChange={setAgent} />
             </div>
-            <AllView skills={filterSkills(skills, category)} allSkills={skills} query={query} sort={sort} onRefresh={setSkills} onDiff={setDiffSkill} onUninstall={setUninstallSkill} onEdit={setEditSkill} onConsolidate={setConsolidateSkill} />
+            <AllView skills={filterByAgent(filterSkills(skills, category), agent)} allSkills={skills} query={query} sort={sort} onRefresh={setSkills} onDiff={setDiffSkill} onUninstall={setUninstallSkill} onEdit={setEditSkill} onConsolidate={setConsolidateSkill} />
           </>
         )}
         {consolidateSkill && skills && <MissingView skills={skills} onRefresh={setSkills} onDiff={setDiffSkill} consolidate={consolidateSkill} onConsolidated={() => setConsolidateSkill(null)} dialogOnly />}

@@ -55,6 +55,11 @@ export function UninstallDialog({ skill, onClose, onRefresh }: {
           <DialogTitle>Uninstall {skill?.name}</DialogTitle>
           <DialogDescription>Review every affected path before continuing. Real content moves to the macOS Trash and is recoverable there.</DialogDescription>
         </DialogHeader>
+        {skill?.managed_source && (
+          <p role="note" className="rounded-md border border-amber-600/50 bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+            Managed skill — this removes it from {agentLabels[skill.managed_source.agent]}'s plugin cache. The agent may re-install it next time it updates or re-syncs its plugins.
+          </p>
+        )}
         <label className="grid gap-1 text-sm font-medium">
           Remove from
           <select className="h-9 rounded-md border border-input bg-background px-3" value={root} disabled={busy} onChange={(event) => { setActions(null); setRoot(event.target.value); }}>

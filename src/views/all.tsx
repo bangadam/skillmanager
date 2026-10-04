@@ -146,7 +146,9 @@ export function AllView({ skills, allSkills, query, sort, onRefresh, onDiff, onU
                   {skill.date_source === "modified" && <span className="sr-only"> (modified, not created)</span>}
                 </TableCell>
                 <TableCell className="py-5 text-right align-top">
-                  {!skill.managed_source && <>{skill.presences.filter((copy) => copy.kind === "real_dir").length > 1 && <Button variant="ghost" size="sm" onClick={() => onConsolidate(skill)}>Consolidate copies <span className="sr-only">of {skill.name}</span></Button>}<Button variant="ghost" size="sm" onClick={() => onEdit(skill)}>Edit <span className="sr-only">{skill.name}</span></Button><RenameDialog skill={skill} skills={allSkills} onRefresh={onRefresh} /><Button variant="ghost" size="sm" onClick={() => onUninstall(skill)}>Uninstall <span className="sr-only">{skill.name}</span></Button></>}
+                  {skill.managed_source
+                    ? <Button variant="ghost" size="sm" onClick={() => onUninstall(skill)}>Uninstall <span className="sr-only">{skill.name}</span></Button>
+                    : <>{skill.presences.filter((copy) => copy.kind === "real_dir").length > 1 && <Button variant="ghost" size="sm" onClick={() => onConsolidate(skill)}>Consolidate copies <span className="sr-only">of {skill.name}</span></Button>}<Button variant="ghost" size="sm" onClick={() => onEdit(skill)}>Edit <span className="sr-only">{skill.name}</span></Button><RenameDialog skill={skill} skills={allSkills} onRefresh={onRefresh} /><Button variant="ghost" size="sm" onClick={() => onUninstall(skill)}>Uninstall <span className="sr-only">{skill.name}</span></Button></>}
                 </TableCell>
               </TableRow>
               )),
