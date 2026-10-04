@@ -1,30 +1,35 @@
-import { agentMeta } from "@/components/agent-meta";
-import type { Agent, SkillState } from "@/views/all";
+import type { SkillState } from "@/views/all";
 
 export type SkillGroup = { key: string; label: string; skills: SkillState[] };
 
-export function skillGroupKey(skill: SkillState): string {
-  const source = skill.managed_source;
-  if (!source) return "mine";
-  if (source.plugin) return `plugin:${source.plugin}`;
-  return `managed:${source.kind}:${source.agent}`;
+export function folderGroupKey(skill: SkillState): string {
+  return skill.folder ?? "(unknown)";
 }
 
-export function skillGroupLabel(key: string): string {
-  if (key === "mine") return "Your skills";
-  if (key.startsWith("plugin:")) return key.slice("plugin:".length);
-  const [, kind, agent] = key.split(":");
-  return `${agentMeta[agent as Agent].label} ${kind === "built_in" ? "built-ins" : "plugins"}`;
+// Longest common directory-boundary prefix across all folders — in practice $HOME.
+export function homePrefix(skills: SkillState[]): string {
+  const folders = skills.map((skill) => skill.folder).filter((folder): folder is string => folder != null);
+  return folders.length === 0 ? "" : folders.reduce((prefix, folder) => {
+    let i = 0;
+    while (i < prefix.length && i < folder.length && prefix[i] === folder[i]) i++;
+    // Snap back to a directory boundary so the prefix never cuts mid-segment.
+    return prefix.slice(0, prefix.lastIndexOf("/", i - 1) + 1);
+  });
 }
 
-export function sourceGroups(skills: SkillState[]): SkillGroup[] {
+// Groups by the folder the skill is saved in, symlinks resolved; labels trim `home` to `~`.
+// `home` defaults to the passed list's own prefix; pass the app-wide one to keep labels
+// stable when the list is filtered down to a single folder.
+export function folderGroups(skills: SkillState[], home = homePrefix(skills)): SkillGroup[] {
+  // Trim only when it shortens: home === folder (everything in one dir) reads better untrimmed.
+  const trim = (folder: string) => home && folder.length > home.length && folder.startsWith(home)
+    ? `~${folder.slice(home.length)}` : folder;
   const groups = new Map<string, SkillGroup>();
   for (const skill of skills) {
-    const key = skillGroupKey(skill);
-    const group = groups.get(key) ?? { key, label: skillGroupLabel(key), skills: [] };
+    const key = folderGroupKey(skill);
+    const group = groups.get(key) ?? { key, label: key === "(unknown)" ? "Unknown location" : trim(key), skills: [] };
     group.skills.push(skill);
     groups.set(key, group);
   }
-  return [...groups.values()].sort((a, b) =>
-    a.key === "mine" ? -1 : b.key === "mine" ? 1 : a.label.localeCompare(b.label));
+  return [...groups.values()].sort((a, b) => a.key.localeCompare(b.key));
 }

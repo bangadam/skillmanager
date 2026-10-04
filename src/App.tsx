@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Sidebar, type View } from "@/components/sidebar";
 import { ListToolbar } from "@/components/list-toolbar";
 import { SkillDetail } from "@/components/skill-detail";
-import { skillGroupKey } from "@/lib/skill-groups";
+import { folderGroupKey, homePrefix } from "@/lib/skill-groups";
 import { categoryOptions } from "@/lib/categories";
 import { useSkills } from "@/hooks/use-skills";
 import { AllView, type Agent, type SkillState } from "@/views/all";
@@ -19,6 +19,7 @@ export default function App() {
   const { skills, setSkills, roots, error, configError, refresh } = useSkills();
   const [view, setView] = useState<View>("all");
   const [groupFilter, setGroupFilter] = useState<string | null>(null);
+  const folderHome = useMemo(() => skills === null ? "" : homePrefix(skills), [skills]);
   const [bulkGroup, setBulkGroup] = useState<BulkGroup | null>(null);
   const [agentFilter, setAgentFilter] = useState<Agent | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
@@ -32,6 +33,7 @@ export default function App() {
   const [editSkill, setEditSkill] = useState<SkillState | null>(null);
   const [consolidateSkill, setConsolidateSkill] = useState<SkillState | null>(null);
   const [detailWidth, setDetailWidth] = useState(480);
+  const [sidebarWidth, setSidebarWidth] = useState(240);
 
   useEffect(() => {
     if (skills === null) return;
@@ -40,7 +42,7 @@ export default function App() {
   }, [skills, selected]);
 
   useEffect(() => {
-    if (groupFilter !== null && skills !== null && !skills.some((skill) => skillGroupKey(skill) === groupFilter)) setGroupFilter(null);
+    if (groupFilter !== null && skills !== null && !skills.some((skill) => folderGroupKey(skill) === groupFilter)) setGroupFilter(null);
   }, [skills, groupFilter]);
 
   useEffect(() => {
@@ -56,7 +58,7 @@ export default function App() {
   }, [skills]);
 
   const visible = useMemo(() => skills === null ? [] : skills.filter((skill) =>
-    (groupFilter === null || skillGroupKey(skill) === groupFilter)
+    (groupFilter === null || folderGroupKey(skill) === groupFilter)
     && (agentFilter === null || skill.presences.some((presence) => presence.agent === agentFilter))
     && (categoryFilter === null || skill.category === categoryFilter)), [skills, groupFilter, agentFilter, categoryFilter]);
   const selectedSkill = skills?.find((skill) => skill.id === selected) ?? null;
@@ -80,7 +82,7 @@ export default function App() {
   return (
     <div className="flex h-dvh overflow-hidden bg-background text-foreground">
       <Sidebar skills={skills ?? []} roots={roots} view={view} onView={setView} agentFilter={agentFilter} onAgentFilter={setAgentFilter} groupFilter={groupFilter} onGroupFilter={setGroupFilter}
-        categories={categories} categoryFilter={categoryFilter} onCategoryFilter={setCategoryFilter} />
+        categories={categories} categoryFilter={categoryFilter} onCategoryFilter={setCategoryFilter} width={sidebarWidth} onWidthChange={setSidebarWidth} />
       <div className="flex min-w-0 flex-1 flex-col">
         {configError && (
           <p role="alert" className="border-b border-destructive/30 px-4 py-2 text-sm text-destructive">
@@ -103,7 +105,7 @@ export default function App() {
             ) : view === "missing" ? (
               <MissingView skills={skills} roots={roots ?? []} selectedId={selected} onSelect={setSelected} onRefresh={setSkills} onDiff={setDiffSkill} />
             ) : (
-              <AllView skills={visible} query={query} sort={sort} categoryFilter={categoryFilter} selectedId={selected} onSelect={setSelected}
+              <AllView skills={visible} query={query} sort={sort} categoryFilter={categoryFilter} selectedId={selected} onSelect={setSelected} folderHome={folderHome}
                 onRemoveSelected={removeSelected} checked={checked} checkedOwnCount={checkedOwn.length}
                 onToggleCheck={toggleCheck} onBulkEdit={() => setBulkEditIds(checkedOwn.map((skill) => skill.id))} onClearChecks={clearChecks} onSetChecked={setChecks} />
             )}

@@ -119,6 +119,22 @@ fn symlink_presence_uses_target_content_but_reports_link() {
     assert_eq!(result[0].presences[0].kind, PresenceKind::Link);
 }
 
+#[cfg(unix)]
+#[test]
+fn folder_reports_resolved_parent_of_symlinked_skill() {
+    let temp = tempfile::tempdir().unwrap();
+    let saved = temp.path().join("saved");
+    let linked = temp.path().join("linked");
+    fs::create_dir_all(&saved).unwrap();
+    fs::create_dir(&linked).unwrap();
+    skill(&saved, "one", "---\nname: One\n---\nbody");
+    std::os::unix::fs::symlink(saved.join("one"), linked.join("one")).unwrap();
+    let result = scan(&[Root { agent: Agent::ClaudeCode, path: linked }]).unwrap();
+    // canonicalize matches macOS resolving /var through its /private/var symlink.
+    assert_eq!(result[0].folder, saved.canonicalize().ok().map(|p| p.to_string_lossy().into_owned()));
+    assert_eq!(result[0].presences[0].kind, PresenceKind::Link);
+}
+
 #[test]
 fn date_source_honestly_matches_filesystem_birth_or_fallback() {
     let temp = tempfile::tempdir().unwrap();

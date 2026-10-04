@@ -87,6 +87,9 @@ pub struct SkillState {
     pub date_source: DateSource,
     pub managed_source: Option<ManagedSource>,
     pub divergent_pairs: Vec<DivergentPair>,
+    /// Parent directory of the skill's on-disk location, symlinks resolved — where the
+    /// skill is actually saved. Linked presences point here from each agent's root.
+    pub folder: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -131,6 +134,14 @@ fn record(
     link_metadata: &fs::Metadata,
     metadata: &fs::Metadata,
 ) {
+    // Canonicalize the skill path itself so a symlinked presence resolves through to where the
+    // skill is actually saved (`~/.claude/skills/godmode` → `~/.hermes/skills/red-teaming`).
+    // A missing target (broken link) is already skipped by the caller; the parent fallback keeps
+    // unreadable-but-present cases working.
+    // ponytail: Windows UNC paths — switch to the `dunce` crate if that ever matters.
+    let folder = path.canonicalize().ok()
+        .or_else(|| path.parent().and_then(|parent| parent.canonicalize().ok()))
+        .and_then(|canonical| canonical.parent().map(|parent| parent.to_string_lossy().into_owned()));
     let (name, description, category) = fs::read_to_string(path.join("SKILL.md"))
         .ok()
         .and_then(|text| parser.parse::<FrontMatter>(&text).ok()?.data)
@@ -164,6 +175,7 @@ fn record(
         date_source,
         managed_source: None,
         divergent_pairs: Vec::new(),
+        folder,
     })
     .presences.push(Presence { agent, path, kind });
 }

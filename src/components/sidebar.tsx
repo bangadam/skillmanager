@@ -1,25 +1,26 @@
-import { useMemo, useState, type ReactNode } from "react";
-import { Bot, ChevronDown, Code2, Database, Layers, Microscope, Package, Palette, PenLine, Server, ShieldCheck, Shapes, PanelLeft, TriangleAlert, User } from "lucide-react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { Bot, ChevronDown, Code2, Database, Folder, Layers, Microscope, Palette, PenLine, Server, ShieldCheck, Shapes, PanelLeft, TriangleAlert } from "lucide-react";
 import { cn } from "cn";
 import { AgentIcon, agentMeta } from "@/components/agent-meta";
 import type { Agent, Presence, SkillState } from "@/views/all";
 import { covers } from "@/lib/utils";
-import { sourceGroups } from "@/lib/skill-groups";
+import { folderGroups } from "@/lib/skill-groups";
 import type { Root } from "@/views/missing";
 import type { CategoryOption } from "@/lib/categories";
 export type View = "all" | "missing" | "duplicates";
 
-function NavItem({ active, onClick, icon, count, label }: {
+function NavItem({ active, onClick, icon, count, label, title }: {
   active: boolean;
   onClick: () => void;
   icon?: ReactNode;
   count?: number;
   label: string;
+  title?: string;
 }) {
   return (
     <button
       type="button"
-      title={label}
+      title={title ?? label}
       onClick={onClick}
       aria-current={active ? "page" : undefined}
       className={cn(
@@ -74,7 +75,7 @@ const categoryIcons: Record<string, ReactNode> = {
   writing: <PenLine aria-hidden="true" className="size-4 shrink-0" />,
 };
 
-export function Sidebar({ skills, roots, view, onView, agentFilter, onAgentFilter, groupFilter, onGroupFilter, categories, categoryFilter, onCategoryFilter }: {
+export function Sidebar({ skills, roots, view, onView, agentFilter, onAgentFilter, groupFilter, onGroupFilter, categories, categoryFilter, onCategoryFilter, width, onWidthChange }: {
   skills: SkillState[];
   roots: Root[] | null;
   view: View;
@@ -86,14 +87,41 @@ export function Sidebar({ skills, roots, view, onView, agentFilter, onAgentFilte
   categories: CategoryOption[];
   categoryFilter: string | null;
   onCategoryFilter: (category: string | null) => void;
+  width: number;
+  onWidthChange: (width: number) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const agents = roots === null ? [] : [...new Set(roots.map((root) => root.agent))];
   const missingCount = useMemo(() => skills.filter((skill) => roots !== null && isMissing(skill, roots)).length, [skills, roots]);
-  const groups = useMemo(() => sourceGroups(skills), [skills]);
+  const groups = useMemo(() => folderGroups(skills), [skills]);
+  const startResize = (down: React.PointerEvent) => {
+    const startX = down.clientX;
+    const startWidth = width;
+    down.currentTarget.setPointerCapture(down.pointerId);
+    setDragging(true);
+    const move = (move: PointerEvent) => {
+      onWidthChange(Math.min(Math.max(startWidth + (move.clientX - startX), 200), 420));
+    };
+    const up = () => {
+      setDragging(false);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
 
   return (
-    <nav aria-label="Skill views" className={`flex shrink-0 flex-col border-r border-border bg-sidebar transition-[width] ${collapsed ? "w-14" : "w-14 md:w-60"}`}>
+    <nav aria-label="Skill views" style={{ "--sidebar-w": `${width}px` } as CSSProperties}
+      className={cn("relative flex shrink-0 flex-col border-r border-border bg-sidebar", collapsed ? "w-14" : "w-14 md:w-[var(--sidebar-w)]", dragging ? "" : "transition-[width]")}>
+      <div role="separator" aria-orientation="vertical" aria-label="Resize sidebar" tabIndex={0}
+        onPointerDown={startResize}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowLeft") onWidthChange(Math.max(width - 24, 200));
+          if (event.key === "ArrowRight") onWidthChange(Math.min(width + 24, 420));
+        }}
+        className="absolute inset-y-0 right-0 z-10 hidden w-1.5 translate-x-px cursor-col-resize bg-transparent transition-colors hover:bg-ring/40 focus-visible:outline-2 focus-visible:outline-ring md:block" />
       <div className="flex items-center justify-center gap-2 px-0 pb-1 pt-4 md:justify-start md:px-4">
         <button
           type="button"
@@ -126,11 +154,9 @@ export function Sidebar({ skills, roots, view, onView, agentFilter, onAgentFilte
         {!collapsed && <SectionHeading>Collections</SectionHeading>}
         <div className="mt-3 space-y-0.5 md:mt-0">
           {groups.map((group) => (
-            <NavItem key={group.key} label={group.label} active={view === "all" && groupFilter === group.key}
+            <NavItem key={group.key} label={group.label} title={group.key} active={view === "all" && groupFilter === group.key}
               onClick={() => { onView("all"); onGroupFilter(groupFilter === group.key ? null : group.key); onAgentFilter(null); }}
-              icon={group.key === "mine" ? <User aria-hidden="true" className="size-4 shrink-0" />
-                : group.key.startsWith("plugin:") ? <Package aria-hidden="true" className="size-4 shrink-0" />
-                : <AgentIcon agent={group.key.split(":")[2] as Agent} className="size-4" />}
+              icon={<Folder aria-hidden="true" className="size-4 shrink-0" />}
               count={group.skills.length} />
           ))}
         </div>

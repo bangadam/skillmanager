@@ -6,7 +6,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/
 import { AgentIcon } from "@/components/agent-meta";
 import { categoryLabel } from "@/lib/categories";
 import { formatDate } from "@/lib/utils";
-import { sourceGroups } from "@/lib/skill-groups";
+import { folderGroups } from "@/lib/skill-groups";
 import { filterAndSortSkills, type SkillSort } from "./sort-skills";
 
 export type Agent = "claude_code" | "codex" | "cursor" | "omp" | "hermes";
@@ -21,9 +21,10 @@ export type SkillState = {
   date_millis: number | null;
   date_source: "created" | "modified" | "unavailable";
   managed_source?: { agent: Agent; kind: "plugin" | "built_in"; plugin: string | null } | null;
+  folder?: string | null;
 };
 
-export function AllView({ skills, query, sort, categoryFilter, selectedId, onSelect, onRemoveSelected, checked, checkedOwnCount, onToggleCheck, onBulkEdit, onClearChecks, onSetChecked }: {
+export function AllView({ skills, query, sort, categoryFilter, selectedId, onSelect, onRemoveSelected, checked, checkedOwnCount, onToggleCheck, onBulkEdit, onClearChecks, onSetChecked, folderHome }: {
   skills: SkillState[];
   query: string;
   sort: SkillSort;
@@ -37,8 +38,10 @@ export function AllView({ skills, query, sort, categoryFilter, selectedId, onSel
   onBulkEdit: () => void;
   onClearChecks: () => void;
   onSetChecked: (ids: string[]) => void;
+  folderHome: string;
 }) {
   const visibleSkills = filterAndSortSkills(skills, query, sort);
+  const groups = folderGroups(visibleSkills, folderHome);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const onToggleGroup = (key: string) =>
     setCollapsed((prev) => { const next = new Set(prev); prev.has(key) ? next.delete(key) : next.add(key); return next; });
@@ -67,7 +70,7 @@ export function AllView({ skills, query, sort, categoryFilter, selectedId, onSel
         </Empty>
       ) : (
         <ul className="space-y-1">
-          {sourceGroups(visibleSkills).map((group) => {
+          {groups.map((group) => {
             const isCollapsed = collapsed.has(group.key);
             return (
             <li key={group.key}>
@@ -78,7 +81,7 @@ export function AllView({ skills, query, sort, categoryFilter, selectedId, onSel
                 className="flex w-full items-center gap-1.5 rounded-md px-3 pb-0.5 pt-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring first:pt-1"
               >
                 <ChevronDown aria-hidden="true" className={cn("size-3.5 shrink-0 transition-transform", isCollapsed && "-rotate-90")} />
-                {group.key === "mine" ? "Your skills" : group.label}
+                <span title={group.key} className="min-w-0 truncate normal-case tracking-normal">{group.label}</span>
                 <span className="font-normal">({group.skills.length})</span>
               </button>
               {!isCollapsed && group.skills.map((skill) => {
